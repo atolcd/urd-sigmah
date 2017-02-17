@@ -9,12 +9,12 @@ package org.sigmah.client.ui.view.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -50,6 +50,7 @@ public class ContactDetailsView extends AbstractView implements ContactDetailsPr
   private ContentPanel container;
   private ToolBar toolBar;
   private Button saveButton;
+  private Button deleteButton;
   private Button exportButton;
 
   @Override
@@ -60,12 +61,14 @@ public class ContactDetailsView extends AbstractView implements ContactDetailsPr
     add(container);
 
     saveButton = Forms.button(I18N.CONSTANTS.save(), IconImageBundle.ICONS.save());
+    deleteButton = Forms.button(I18N.CONSTANTS.delete(), IconImageBundle.ICONS.remove());
     exportButton = Forms.button(I18N.CONSTANTS.export(), IconImageBundle.ICONS.excel());
 
     toolBar = new ToolBar();
     toolBar.setAlignment(Style.HorizontalAlignment.LEFT);
     toolBar.setBorders(false);
     toolBar.add(saveButton);
+    toolBar.add(deleteButton);
     toolBar.add(exportButton);
 
     container.setTopComponent(toolBar);
@@ -129,6 +132,11 @@ public class ContactDetailsView extends AbstractView implements ContactDetailsPr
   @Override
   public Button getSaveButton() {
     return saveButton;
+  }
+
+  @Override
+  public Button getDeleteButton() {
+    return deleteButton;
   }
 
   @Override

@@ -73,7 +73,6 @@
 		<class>org.sigmah.server.domain.Site</class>
 		<class>org.sigmah.server.domain.User</class>
 		<class>org.sigmah.server.domain.UserDatabase</class>
-		<class>org.sigmah.server.domain.UserPermission</class>
 
 		<!-- calendar package. -->
 		<class>org.sigmah.server.domain.calendar.PersonalCalendar</class>
@@ -87,6 +86,7 @@
 		<class>org.sigmah.server.domain.element.BudgetDistributionElement</class>
 		<class>org.sigmah.server.domain.element.BudgetElement</class>
 		<class>org.sigmah.server.domain.element.BudgetSubField</class>
+		<class>org.sigmah.server.domain.element.BudgetRatioElement</class>
 		<class>org.sigmah.server.domain.element.CheckboxElement</class>
 		<class>org.sigmah.server.domain.element.ContactListElement</class>
 		<class>org.sigmah.server.domain.element.DefaultFlexibleElement</class>
@@ -100,6 +100,7 @@
 		<class>org.sigmah.server.domain.element.ReportListElement</class>
 		<class>org.sigmah.server.domain.element.TextAreaElement</class>
 		<class>org.sigmah.server.domain.element.TripletsListElement</class>
+		<class>org.sigmah.server.domain.element.ComputationElement</class>
 
 		<!-- export package. -->
 		<class>org.sigmah.server.domain.export.GlobalExport</class>

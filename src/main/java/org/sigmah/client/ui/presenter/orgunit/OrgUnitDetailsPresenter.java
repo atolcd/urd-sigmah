@@ -91,6 +91,7 @@ import com.google.inject.ImplementedBy;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.sigmah.client.computation.ComputationTriggerManager;
+import org.sigmah.client.event.UpdateEvent;
 
 /**
  * OrgUnit Details Presenter.
@@ -118,13 +119,13 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 	 * List of values changes.
 	 */
 	private List<ValueEvent> valueChanges;
-
+    
 	private final Map<Integer, IterationChange> iterationChanges = new HashMap<Integer, IterationChange>();
 
 	private final Map<Integer, IterableGroupItem> newIterationsTabItems = new HashMap<Integer, IterableGroupItem>();
 
 
-	/**
+    /**
 	 * Listen to the values of flexible elements to update computated values.
 	 */
 	@Inject
@@ -247,6 +248,9 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 			if(!groupLayout.getHasIterations()) {
 
 				FieldSet fieldSet = createGroupLayoutFieldSet(getOrgUnit(), groupLayout, queue, null, null, null);
+				fieldSet.setHeadingHtml(groupLayout.getTitle());
+				fieldSet.setCollapsible(true);
+				fieldSet.setBorders(true);
 				gridLayout.setWidget(groupLayout.getRow(), groupLayout.getColumn(), fieldSet);
 				continue;
 			}
@@ -334,95 +338,95 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 	public FieldSet createGroupLayoutFieldSet(FlexibleElementContainer container, LayoutGroupDTO groupLayout, DispatchQueue queue, final Integer iterationId, final IterableGroupPanel tabPanel, final IterableGroupItem tabItem) {
 		final OrgUnitDTO orgUnit = (OrgUnitDTO)container;
 
-    // Creates the fieldset and positions it.
+			// Creates the fieldset and positions it.
 		final FieldSet fieldSet = (FieldSet) groupLayout.getWidget();
 
-		// For each constraint in the current layout group.
-		if (ClientUtils.isEmpty(groupLayout.getConstraints())) {
+			// For each constraint in the current layout group.
+			if (ClientUtils.isEmpty(groupLayout.getConstraints())) {
 			return fieldSet;
-		}
-
-		for (final LayoutConstraintDTO constraintDTO : groupLayout.getConstraints()) {
-
-			// Gets the element managed by this constraint.
-			final FlexibleElementDTO elementDTO = constraintDTO.getFlexibleElementDTO();
-
-			// --
-			// -- DISABLED ELEMENTS
-			// --
-
-			if(elementDTO.isDisabled()) {
-				continue;
 			}
 
-			// --
-			// -- ELEMENT VALUE
-			// --
+			for (final LayoutConstraintDTO constraintDTO : groupLayout.getConstraints()) {
 
-			// Remote call to ask for this element value.
+				// Gets the element managed by this constraint.
+				final FlexibleElementDTO elementDTO = constraintDTO.getFlexibleElementDTO();
+
+				// --
+				// -- DISABLED ELEMENTS
+				// --
+				
+				if(elementDTO.isDisabled()) {
+					continue;
+				}
+				
+				// --
+				// -- ELEMENT VALUE
+				// --
+
+				// Remote call to ask for this element value.
 			GetValue getValue;
 
 			getValue = new GetValue(orgUnit.getId(), elementDTO.getId(), elementDTO.getEntityName(), null, iterationId);
 
 			queue.add(getValue, new CommandResultHandler<ValueResult>() {
 
-				@Override
-				public void onCommandFailure(final Throwable throwable) {
-					if (Log.isErrorEnabled()) {
-						Log.error("Error, element value not loaded.", throwable);
-					}
-					throw new RuntimeException(throwable);
-				}
-
-				@Override
-				public void onCommandSuccess(final ValueResult valueResult) {
-
-					if (Log.isDebugEnabled()) {
-						Log.debug("Element value(s) object : " + valueResult);
+					@Override
+					public void onCommandFailure(final Throwable throwable) {
+						if (Log.isErrorEnabled()) {
+							Log.error("Error, element value not loaded.", throwable);
+						}
+						throw new RuntimeException(throwable);
 					}
 
-					// --
-					// -- ELEMENT COMPONENT
-					// --
+					@Override
+					public void onCommandSuccess(final ValueResult valueResult) {
 
-					// Configures the flexible element for the current application state before generating its component.
-					elementDTO.setService(dispatch);
-					elementDTO.setAuthenticationProvider(injector.getAuthenticationProvider());
-					elementDTO.setEventBus(eventBus);
-					elementDTO.setCache(injector.getClientCache());
+						if (Log.isDebugEnabled()) {
+							Log.debug("Element value(s) object : " + valueResult);
+						}
+
+						// --
+						// -- ELEMENT COMPONENT
+						// --
+
+						// Configures the flexible element for the current application state before generating its component.
+						elementDTO.setService(dispatch);
+						elementDTO.setAuthenticationProvider(injector.getAuthenticationProvider());
+						elementDTO.setEventBus(eventBus);
+						elementDTO.setCache(injector.getClientCache());
 					elementDTO.setCurrentContainerDTO(orgUnit);
-					elementDTO.setTransfertManager(injector.getTransfertManager());
-					elementDTO.assignValue(valueResult);
+						elementDTO.setTransfertManager(injector.getTransfertManager());
+						elementDTO.assignValue(valueResult);
 					elementDTO.setTabPanel(tabPanel);
 
-					// Generates element component (with the value).
-					elementDTO.init();
-					final Component elementComponent = elementDTO.getElementComponent(valueResult);
+						// Generates element component (with the value).
+						elementDTO.init();
+						final Component elementComponent = elementDTO.getElementComponent(valueResult);
 
-					// Component width.
-					final FormData formData;
-					if (elementDTO.getPreferredWidth() == 0) {
-						formData = new FormData("100%");
-					} else {
-						formData = new FormData(elementDTO.getPreferredWidth(), -1);
-					}
+						// Component width.
+						final FormData formData;
+						if (elementDTO.getPreferredWidth() == 0) {
+							formData = new FormData("100%");
+						} else {
+							formData = new FormData(elementDTO.getPreferredWidth(), -1);
+						}
 
-					if (elementComponent != null) {
+						if (elementComponent != null) {
 						fieldSet.add(elementComponent, formData);
-					}
+						}
 					fieldSet.layout();
 
-					// --
-					// -- ELEMENT HANDLERS
-					// --
+						// --
+						// -- ELEMENT HANDLERS
+						// --
+                        
+                        // Adds a value change handler if this element is a dependency of a ComputationElementDTO.
+						computationTriggerManager.listenToValueChangesOfElement(elementDTO, elementComponent, valueChanges);
 
-					// Adds a value change handler if this element is a dependency of a ComputationElementDTO.
-					computationTriggerManager.listenToValueChangesOfElement(elementDTO, elementComponent, valueChanges);
+						// Adds a value change handler to this element.
+						elementDTO.addValueHandler(new ValueHandler() {
 
-					// Adds a value change handler to this element.
-					elementDTO.addValueHandler(new ValueHandler() {
-
-						@Override
+							@Override
 						public void onValueChange(final ValueEvent event) {
 
 							if(tabPanel != null) {
@@ -431,13 +435,13 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 
 							// TODO: Find linked computation fields if any and recompute the value.
 
-							// Stores the change to be saved later.
-							valueChanges.add(event);
+								// Stores the change to be saved later.
+								valueChanges.add(event);
 
-							// Enables the save action.
-							view.getSaveButton().enable();
-						}
-					});
+								// Enables the save action.
+								view.getSaveButton().enable();
+							}
+						});
 
 
 					if(elementDTO.getValidates() && tabItem != null) {
@@ -445,9 +449,9 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 						tabItem.refreshTitle();
 						elementDTO.addRequiredValueHandler(new RequiredValueHandlerImpl(elementDTO));
 					}
-				}
-			}, new LoadingMask(view.getContentOrgUnitDetailsPanel()));
-		}
+					}
+				}, new LoadingMask(view.getContentOrgUnitDetailsPanel()));
+			}
 
 		fieldSet.setCollapsible(false);
 		fieldSet.setAutoHeight(true);
@@ -455,7 +459,7 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 		fieldSet.setHeadingHtml("");
 
 		return fieldSet;
-	}
+		}
 
 	/**
 	 * Internal class handling the value changes of the required elements.
@@ -545,6 +549,8 @@ public class OrgUnitDetailsPresenter extends AbstractOrgUnitPresenter<OrgUnitDet
 						}
 
 						valueChanges.clear();
+
+						eventBus.fireEvent(new UpdateEvent(UpdateEvent.VALUE_UPDATE, getOrgUnit()));
 
 					}
 

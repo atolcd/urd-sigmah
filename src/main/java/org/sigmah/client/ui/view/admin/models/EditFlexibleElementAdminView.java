@@ -23,6 +23,7 @@ package org.sigmah.client.ui.view.admin.models;
  */
 
 
+import com.allen_sauer.gwt.log.client.Log;
 import com.google.gwt.dom.client.Style.TableLayout;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
@@ -144,11 +145,19 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 
 	private FlexTable budgetFields;
 	private FlexTable ratioFlexTable;
+	
+	private ComboBox<FlexibleElementDTO> budgetSubFieldSpentCombo;
+	private ComboBox<FlexibleElementDTO> budgetSubFieldPlannedCombo;
+	private ListStore<FlexibleElementDTO> budgetSubFieldSpentStore;
+	private ListStore<FlexibleElementDTO> budgetSubFieldPlannedStore;
+	
 	private ComboBox<BudgetSubFieldDTO> upBudgetSubFieldCombo;
 	private ComboBox<BudgetSubFieldDTO> downBudgetSubFieldCombo;
 	private ListStore<BudgetSubFieldDTO> upBudgetSubFieldStore;
 	private ListStore<BudgetSubFieldDTO> downBudgetSubFieldStore;
 	private Anchor anchorAddSubField;
+	
+	
 	
     // --
     // Computation specific fields.
@@ -220,7 +229,7 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 		mandatoryField = Forms.checkbox("", null, I18N.CONSTANTS.adminFlexibleCompulsory(), false);
 		privacyGroupField = Forms.combobox(I18N.CONSTANTS.adminPrivacyGroups(), false, PrivacyGroupDTO.ID, PrivacyGroupDTO.TITLE);
 		privacyGroupField.setEmptyText(I18N.CONSTANTS.adminPrivacyGroupChoice());
-		amendableField = Forms.checkbox("", null, I18N.CONSTANTS.partOfProjectCore(), false);
+		amendableField = Forms.checkbox("", null, IconImageBundle.ICONS.DNABrownGreen().getHTML()+I18N.CONSTANTS.partOfProjectCore(), false);
 		exportableField = Forms.checkbox("", null, I18N.CONSTANTS.adminFlexibleExportable(), false);
 
 		// Form initialization.
@@ -284,9 +293,6 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 		// specific properties for budget field
 		// --
 
-		upBudgetSubFieldStore = new ListStore<BudgetSubFieldDTO>();
-		downBudgetSubFieldStore = new ListStore<BudgetSubFieldDTO>();
-
 		budgetFields = new FlexTable();
 		budgetFields.setVisible(false);
 		budgetFields.setCellSpacing(5);
@@ -303,6 +309,13 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 		anchorAddSubField.setVisible(false);
 
 		ratioFlexTable = new FlexTable();
+		
+		budgetSubFieldSpentStore = new ListStore<FlexibleElementDTO>();
+		budgetSubFieldPlannedStore = new ListStore<FlexibleElementDTO>();
+		
+		budgetSubFieldSpentCombo = Forms.combobox(I18N.CONSTANTS.flexibleElementBudgetDistributionRatio(), true, FlexibleElementDTO.ID, FlexibleElementDTO.LABEL, budgetSubFieldSpentStore);
+		budgetSubFieldPlannedCombo = Forms.combobox(I18N.CONSTANTS.projectPlannedBudget(), true, FlexibleElementDTO.ID, FlexibleElementDTO.LABEL, budgetSubFieldPlannedStore);
+		
 
 		upBudgetSubFieldCombo = new ComboBox<BudgetSubFieldDTO>();
 		upBudgetSubFieldCombo.setDisplayField("label");
@@ -338,7 +351,7 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
         codeGrid.setHeight(200);
         codeGridHeaderLabel = new com.extjs.gxt.ui.client.widget.Label(I18N.CONSTANTS.adminFlexibleComputationCodeGridHeader());
         codeGridHeaderLabel.addStyleName(STYLE_FORM_ITEM);
-
+        
 		// --
 		// Specific fields for contact list fields
 		// --
@@ -379,6 +392,8 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 		specificForm.add(budgetFields);
 		specificForm.add(anchorAddSubField);
 		specificForm.add(ratioFlexTable);
+		specificForm.add(budgetSubFieldSpentCombo);
+		specificForm.add(budgetSubFieldPlannedCombo);
 		// --
 		// Other components.
 		// --
@@ -658,6 +673,21 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 	 * {@inheritDoc}
 	 */
 	@Override
+	public ComboBox<FlexibleElementDTO> getBudgetSubFieldSpentCombo(){
+		return budgetSubFieldSpentCombo;
+	}
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public ComboBox<FlexibleElementDTO> getBudgetSubFieldPlannedCombo(){
+		return budgetSubFieldPlannedCombo;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public ComboBox<BudgetSubFieldDTO> getUpBudgetSubFieldCombo() {
 		return upBudgetSubFieldCombo;
 	}
@@ -676,6 +706,21 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 	@Override
 	public ListStore<BudgetSubFieldDTO> getUpBudgetSubFieldStore() {
 		return upBudgetSubFieldStore;
+	}
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public ListStore<FlexibleElementDTO> getBudgetSubFieldPlannedStore() {
+		return budgetSubFieldPlannedStore;
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public ListStore<FlexibleElementDTO> getBudgetSubFieldSpentStore() {
+		return budgetSubFieldSpentStore;
 	}
 
 	/**
@@ -722,7 +767,7 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 		return contactIsMember;
 	}
 
-	/**
+    /**
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -849,14 +894,16 @@ public class EditFlexibleElementAdminView extends AbstractPopupView<PopupWidget>
 				break;
 
 			case DEFAULT:
-
 				bannerField.show();
 				bannerPositionField.show();
-                
+				
                 if (type == DefaultFlexibleElementType.BUDGET) {
                     budgetFields.setVisible(true);
                     anchorAddSubField.setVisible(true);
                     ratioFlexTable.setVisible(true);
+                }else if (type == DefaultFlexibleElementType.BUDGET_RATIO) {
+					budgetSubFieldSpentCombo.setVisible(true);
+					budgetSubFieldPlannedCombo.setVisible(true);
                 }
 				break;
 

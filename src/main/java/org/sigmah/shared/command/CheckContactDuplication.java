@@ -9,12 +9,12 @@ package org.sigmah.shared.command;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -24,6 +24,7 @@ package org.sigmah.shared.command;
 import org.sigmah.shared.command.base.AbstractCommand;
 import org.sigmah.shared.command.result.ListResult;
 import org.sigmah.shared.dto.ContactDTO;
+import org.sigmah.shared.dto.ContactModelDTO;
 
 public class CheckContactDuplication extends AbstractCommand<ListResult<ContactDTO>> {
   private static final long serialVersionUID = 2632734238352656536L;
@@ -32,16 +33,18 @@ public class CheckContactDuplication extends AbstractCommand<ListResult<ContactD
   private String email;
   private String name;
   private String firstName;
+  private ContactModelDTO contactModelDTO;
 
   public CheckContactDuplication() {
     // Serialization
   }
 
-  public CheckContactDuplication(Integer contactId, String email, String name, String firstName) {
+  public CheckContactDuplication(Integer contactId, String email, String name, String firstName, ContactModelDTO contactModelDTO) {
     this.contactId = contactId;
     this.email = email;
     this.name = name;
     this.firstName = firstName;
+    this.contactModelDTO = contactModelDTO;
   }
 
   public Integer getContactId() {
@@ -58,5 +61,9 @@ public class CheckContactDuplication extends AbstractCommand<ListResult<ContactD
 
   public String getFirstName() {
     return firstName;
+  }
+
+  public ContactModelDTO getContactModelDTO() {
+    return contactModelDTO;
   }
 }

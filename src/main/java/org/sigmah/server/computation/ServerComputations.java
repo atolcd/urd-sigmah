@@ -28,16 +28,41 @@ import java.util.Collections;
 import org.sigmah.server.domain.OrgUnitModel;
 import org.sigmah.server.domain.PhaseModel;
 import org.sigmah.server.domain.ProjectModel;
-import org.sigmah.server.domain.element.*;
+import org.sigmah.server.domain.element.CheckboxElement;
+import org.sigmah.server.domain.element.ComputationElement;
+import org.sigmah.server.domain.element.ContactListElement;
+import org.sigmah.server.domain.element.CoreVersionElement;
+import org.sigmah.server.domain.element.DefaultFlexibleElement;
+import org.sigmah.server.domain.element.FilesListElement;
+import org.sigmah.server.domain.element.FlexibleElement;
+import org.sigmah.server.domain.element.IndicatorsListElement;
+import org.sigmah.server.domain.element.MessageElement;
+import org.sigmah.server.domain.element.QuestionElement;
+import org.sigmah.server.domain.element.ReportElement;
+import org.sigmah.server.domain.element.ReportListElement;
+import org.sigmah.server.domain.element.TextAreaElement;
+import org.sigmah.server.domain.element.TripletsListElement;
 import org.sigmah.server.domain.layout.Layout;
 import org.sigmah.server.domain.layout.LayoutConstraint;
 import org.sigmah.server.domain.layout.LayoutGroup;
-import org.sigmah.shared.dto.element.*;
+import org.sigmah.shared.dto.element.BudgetElementDTO;
+import org.sigmah.shared.dto.element.BudgetRatioElementDTO;
+import org.sigmah.shared.dto.element.CheckboxElementDTO;
+import org.sigmah.shared.dto.element.ComputationElementDTO;
+import org.sigmah.shared.dto.element.ContactListElementDTO;
+import org.sigmah.shared.dto.element.CoreVersionElementDTO;
+import org.sigmah.shared.dto.element.DefaultFlexibleElementDTO;
+import org.sigmah.shared.dto.element.FilesListElementDTO;
+import org.sigmah.shared.dto.element.FlexibleElementDTO;
+import org.sigmah.shared.dto.element.IndicatorsListElementDTO;
+import org.sigmah.shared.dto.element.MessageElementDTO;
+import org.sigmah.shared.dto.element.QuestionElementDTO;
+import org.sigmah.shared.dto.element.ReportElementDTO;
+import org.sigmah.shared.dto.element.ReportListElementDTO;
+import org.sigmah.shared.dto.element.TextAreaElementDTO;
+import org.sigmah.shared.dto.element.TripletsListElementDTO;
 import org.sigmah.shared.dto.referential.DefaultFlexibleElementType;
 import org.sigmah.shared.dto.referential.ElementTypeEnum;
-import static org.sigmah.shared.dto.referential.ElementTypeEnum.CHECKBOX;
-import static org.sigmah.shared.dto.referential.ElementTypeEnum.CORE_VERSION;
-import static org.sigmah.shared.dto.referential.ElementTypeEnum.FILES_LIST;
 import org.sigmah.shared.dto.referential.LogicalElementType;
 import org.sigmah.shared.dto.referential.NoElementType;
 import org.sigmah.shared.dto.referential.TextAreaType;
@@ -99,6 +124,29 @@ public final class ServerComputations {
 		dtos.addAll(toDTOCollection(orgUnitModel.getDetails().getLayout()));
 		return dtos;
 	}
+	
+	/**
+	 * Creates a collection of every layout contained in the given model.
+	 * 
+	 * @param projectModel
+	 *			Project model to search.
+	 * @return A collection of every <code>Layout</code> object.
+	 */
+	public static Collection<Layout> getAllLayoutsFromModel(final ProjectModel projectModel) {
+		
+		if (projectModel == null) {
+			return Collections.<Layout>emptyList();
+		}
+		
+		final ArrayList<Layout> layouts = new ArrayList<>();
+		layouts.add(projectModel.getProjectDetails().getLayout());
+		
+		for (final PhaseModel phaseModel : projectModel.getPhaseModels()) {
+			layouts.add(phaseModel.getLayout());
+		}
+		
+		return layouts;
+	}
 
 	/**
 	 * Extract every element with a code from the given layout and creates a 
@@ -137,11 +185,49 @@ public final class ServerComputations {
 		return dtos;
 	}
 	
+	public static FlexibleElementDTO getElementWithCodeInModel(final String code, final ProjectModel projectModel) {
+		
+		if (code == null) {
+			return null;
+		}
+		
+		for (final Layout layout : getAllLayoutsFromModel(projectModel)) {
+			final FlexibleElementDTO element = getElementWithCodeInLayout(code, layout);
+			if (element != null) {
+				return element;
+			}
+		}
+		
+		return null;
+	}
+	
+	private static FlexibleElementDTO getElementWithCodeInLayout(final String code, final Layout layout) {
+		
+		if (layout == null) {
+			return null;
+		}
+		
+		for (final LayoutGroup group : layout.getGroups()) {
+			for (final LayoutConstraint constraint : group.getConstraints()) {
+				final FlexibleElement element = constraint.getElement();
+				
+				if (element != null && code.equals(element.getCode())) {
+					final FlexibleElementDTO dto = toDTO(element);
+					dto.setId(element.getId());
+					dto.setCode(element.getCode());
+					return dto;
+				}
+			}
+		}
+		
+		return null;
+	}
+	
 	// --
 	// TODO: Merge the following methods with the ones from the #844 branch.
 	// --
 	
-	private static LogicalElementType logicalElementTypeOf(final FlexibleElement element) {
+	public static LogicalElementType logicalElementTypeOf(final FlexibleElement element) {
 		
 		final LogicalElementType type;
 		
@@ -204,8 +290,10 @@ public final class ServerComputations {
 		case DEFAULT:
 			if (type == DefaultFlexibleElementType.BUDGET) {
 				dto = new BudgetElementDTO();
+			} else if (type == DefaultFlexibleElementType.BUDGET_RATIO) {
+				dto = new BudgetRatioElementDTO();
 			} else {
-				dto = new DefaultFlexibleElementDTO();
+				dto = new DefaultFlexibleElementDTO(type.toDefaultFlexibleElementType());
 			}
 			break;
 		case FILES_LIST:
@@ -227,7 +315,7 @@ public final class ServerComputations {
 			dto = new ReportListElementDTO();
 			break;
 		case TEXT_AREA:
-			dto = new TextAreaElementDTO();
+			dto = new TextAreaElementDTO(type.toTextAreaType());
 			break;
 		case TRIPLETS:
 			dto = new TripletsListElementDTO();

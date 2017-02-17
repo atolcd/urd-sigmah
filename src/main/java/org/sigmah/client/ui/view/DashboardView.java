@@ -71,6 +71,7 @@ import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import org.sigmah.client.ui.presenter.DashboardPresenter.ReminderOrMonitoredPointHandler;
 
+
 /**
  * Dashboard view.
  * 
@@ -233,8 +234,8 @@ public class DashboardView extends AbstractView implements DashboardPresenter.Vi
 	public void layoutViews() {
 		if (contactsListWidget != null) {
 			contactsListWidget.getView().syncSize();
-			projectsListWidget.getView().syncSize();
-		}
+		projectsListWidget.getView().syncSize();
+	}
 	}
 	
 	/**

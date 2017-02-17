@@ -94,6 +94,8 @@ import com.google.inject.ImplementedBy;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.sigmah.client.computation.ComputationTriggerManager;
+import org.sigmah.client.util.profiler.Profiler;
+import org.sigmah.client.util.profiler.Scenario;
 
 /**
  * Project's details presenter which manages the {@link ProjectDetailsView}.
@@ -124,7 +126,7 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 	 * List of values changes.
 	 */
 	private final ArrayList<ValueEvent> valueChanges = new ArrayList<ValueEvent>();
-
+	
 	private final Map<Integer, IterationChange> iterationChanges = new HashMap<Integer, IterationChange>();
 
 	private final Map<Integer, IterableGroupItem> newIterationsTabItems = new HashMap<Integer, IterableGroupItem>();
@@ -204,7 +206,7 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 	 *          The project details.
 	 */
 	private void load(final ProjectDetailsDTO details) {
-
+		
 		// Prepare the manager of computation elements
 		computationTriggerManager.prepareForProject(getProject());
 
@@ -238,6 +240,9 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 			if(!groupLayout.getHasIterations()) {
 
 				FieldSet fieldSet = createGroupLayoutFieldSet(getProject(), groupLayout, queue, null, null, null);
+				fieldSet.setHeadingHtml(groupLayout.getTitle());
+				fieldSet.setCollapsible(true);
+				fieldSet.setBorders(true);
 				gridLayout.setWidget(groupLayout.getRow(), groupLayout.getColumn(), fieldSet);
 				continue;
 			}
@@ -334,127 +339,127 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 	public FieldSet createGroupLayoutFieldSet(FlexibleElementContainer container, LayoutGroupDTO groupLayout, DispatchQueue queue, final Integer iterationId, final IterableGroupPanel tabPanel, final IterableGroupItem tabItem) {
 		final ProjectDTO project = (ProjectDTO)container;
 
-		// Creates the fieldset and positions it.
+			// Creates the fieldset and positions it.
 		final FieldSet fieldSet = (FieldSet) groupLayout.getWidget();
 
-		// For each constraint in the current layout group.
-		if (ClientUtils.isEmpty(groupLayout.getConstraints())) {
+			// For each constraint in the current layout group.
+			if (ClientUtils.isEmpty(groupLayout.getConstraints())) {
 			return fieldSet;
-		}
-
-		for (final LayoutConstraintDTO constraintDTO : groupLayout.getConstraints()) {
-
-			// Gets the element managed by this constraint.
-			final FlexibleElementDTO elementDTO = constraintDTO.getFlexibleElementDTO();
-
-			// --
-			// -- DISABLED ELEMENTS
-			// --
-
-			if(elementDTO.isDisabled()) {
-				continue;
 			}
 
-			// --
-			// -- ELEMENT VALUE
-			// --
+			for (final LayoutConstraintDTO constraintDTO : groupLayout.getConstraints()) {
 
-			// Retrieving the current amendment id.
-			final Integer amendmentId;
+				// Gets the element managed by this constraint.
+				final FlexibleElementDTO elementDTO = constraintDTO.getFlexibleElementDTO();
+				
+				// --
+				// -- DISABLED ELEMENTS
+				// --
+				
+				if(elementDTO.isDisabled()) {
+					continue;
+				}
+
+				// --
+				// -- ELEMENT VALUE
+				// --
+
+				// Retrieving the current amendment id.
+				final Integer amendmentId;
 			if (project.getCurrentAmendment() != null) {
 				amendmentId = project.getCurrentAmendment().getId();
-			} else {
-				amendmentId = null;
-			}
+				} else {
+					amendmentId = null;
+				}
 
-			// Remote call to ask for this element value.
+				// Remote call to ask for this element value.
 			GetValue getValue;
 
   		getValue = new GetValue(project.getId(), elementDTO.getId(), elementDTO.getEntityName(), amendmentId, iterationId);
 
 			queue.add(getValue, new CommandResultHandler<ValueResult>() {
 
-				@Override
-				public void onCommandFailure(final Throwable throwable) {
-					if (Log.isErrorEnabled()) {
-						Log.error("Error, element value not loaded.", throwable);
-					}
-					throw new RuntimeException(throwable);
-				}
-
-				@Override
-				public void onCommandSuccess(final ValueResult valueResult) {
-
-					if (Log.isDebugEnabled()) {
-						Log.debug("Element value(s) object : " + valueResult);
+					@Override
+					public void onCommandFailure(final Throwable throwable) {
+						if (Log.isErrorEnabled()) {
+							Log.error("Error, element value not loaded.", throwable);
+						}
+						throw new RuntimeException(throwable);
 					}
 
-					// --
-					// -- ELEMENT COMPONENT
-					// --
+					@Override
+					public void onCommandSuccess(final ValueResult valueResult) {
 
-					// Configures the flexible element for the current application state before generating its component.
-					elementDTO.setService(dispatch);
-					elementDTO.setAuthenticationProvider(injector.getAuthenticationProvider());
-					elementDTO.setEventBus(eventBus);
-					elementDTO.setCache(injector.getClientCache());
+						if (Log.isDebugEnabled()) {
+							Log.debug("Element value(s) object : " + valueResult);
+						}
+
+						// --
+						// -- ELEMENT COMPONENT
+						// --
+
+						// Configures the flexible element for the current application state before generating its component.
+						elementDTO.setService(dispatch);
+						elementDTO.setAuthenticationProvider(injector.getAuthenticationProvider());
+						elementDTO.setEventBus(eventBus);
+						elementDTO.setCache(injector.getClientCache());
 					elementDTO.setCurrentContainerDTO(project);
-					elementDTO.setTransfertManager(injector.getTransfertManager());
-					elementDTO.assignValue(valueResult);
+                        elementDTO.setTransfertManager(injector.getTransfertManager());
+						elementDTO.assignValue(valueResult);
 					elementDTO.setTabPanel(tabPanel);
+						
+						final ProjectPresenter projectPresenter = injector.getProjectPresenter();
 
-					final ProjectPresenter projectPresenter = injector.getProjectPresenter();
+						// Generates element component (with the value).
+						elementDTO.init();
+						final Component elementComponent = elementDTO.getElementComponent(valueResult);
 
-					// Generates element component (with the value).
-					elementDTO.init();
-					final Component elementComponent = elementDTO.getElementComponent(valueResult);
+						if(elementDTO.getAmendable() && projectPresenter.projectIsLocked() && projectPresenter.canUnlockProject() && !ProfileUtils.isGranted(auth(), GlobalPermissionEnum.MODIFY_LOCKED_CONTENT)) {
+							projectPresenter.addUnlockProjectPopup(elementDTO, elementComponent, new LoadingMask(view.getMainPanel()));
+						}
+						
+						// Component width.
+						final FormData formData;
+						if (elementDTO.getPreferredWidth() == 0) {
+							formData = new FormData("100%");
+						} else {
+							formData = new FormData(elementDTO.getPreferredWidth(), -1);
+						}
 
-					if(elementDTO.getAmendable() && projectPresenter.projectIsLocked() && projectPresenter.canUnlockProject() && !ProfileUtils.isGranted(auth(), GlobalPermissionEnum.MODIFY_LOCKED_CONTENT)) {
-						projectPresenter.addUnlockProjectPopup(elementDTO, elementComponent, new LoadingMask(view.getMainPanel()));
-					}
-
-					// Component width.
-					final FormData formData;
-					if (elementDTO.getPreferredWidth() == 0) {
-						formData = new FormData("100%");
-					} else {
-						formData = new FormData(elementDTO.getPreferredWidth(), -1);
-					}
-
-					if (elementComponent != null) {
+						if (elementComponent != null) {
 						fieldSet.add(elementComponent, formData);
-					}
+						}
 					fieldSet.layout();
 
-					// --
-					// -- ELEMENT HANDLERS
-					// --
+						// --
+						// -- ELEMENT HANDLERS
+						// --
+						
+						// Adds a value change handler if this element is a dependency of a ComputationElementDTO.
+						computationTriggerManager.listenToValueChangesOfElement(elementDTO, elementComponent, valueChanges);
 
-					// Adds a value change handler if this element is a dependency of a ComputationElementDTO.
-					computationTriggerManager.listenToValueChangesOfElement(elementDTO, elementComponent, valueChanges);
+						// Adds a value change handler to this element.
+						elementDTO.addValueHandler(new ValueHandler() {
 
-					// Adds a value change handler to this element.
-					elementDTO.addValueHandler(new ValueHandler() {
-
-						@Override
-						public void onValueChange(final ValueEvent event) {
-
+							@Override
+							public void onValueChange(final ValueEvent event) {
+								
 							if(tabPanel != null) {
 								event.setIterationId(tabPanel.getCurrentIterationId());
 							}
 
-							// TODO: Find linked computation fields if any and recompute the value.
+								// TODO: Find linked computation fields if any and recompute the value.
 
-							// Stores the change to be saved later.
-							valueChanges.add(event);
+								// Stores the change to be saved later.
+								valueChanges.add(event);
 
-							if (!getParentPresenter().getCurrentDisplayedPhase().isEnded()) {
+								if (!getParentPresenter().getCurrentDisplayedPhase().isEnded()) {
 
-								// Enables the save action.
-								view.getSaveButton().enable();
+									// Enables the save action.
+									view.getSaveButton().enable();
+								}
 							}
-						}
-					});
+						});
 
 
 					if(elementDTO.getValidates() && tabItem != null) {
@@ -462,9 +467,9 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 						tabItem.refreshTitle();
 						elementDTO.addRequiredValueHandler(new RequiredValueHandlerImpl(elementDTO));
 					}
-				}
-			}, new LoadingMask(view.getMainPanel()));
-		}
+					}
+				}, new LoadingMask(view.getMainPanel()));
+			}
 
 		fieldSet.setCollapsible(false);
 		fieldSet.setAutoHeight(true);
@@ -472,7 +477,7 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 		fieldSet.setHeadingHtml("");
 
 		return fieldSet;
-	}
+		}
 
 	/**
 	 * Internal class handling the value changes of the required elements.
@@ -541,52 +546,53 @@ public class ProjectDetailsPresenter extends AbstractProjectPresenter<ProjectDet
 				iterationChanges.clear();
 				newIterationsTabItems.clear();
 
-				dispatch.execute(new UpdateProject(getProject().getId(), valueChanges), new CommandResultHandler<VoidResult>() {
+		dispatch.execute(new UpdateProject(getProject().getId(), valueChanges), new CommandResultHandler<VoidResult>() {
 
-					@Override
-					public void onCommandFailure(final Throwable caught) {
-						N10N.error(I18N.CONSTANTS.save(), I18N.CONSTANTS.saveError());
-					}
-
-					@Override
-					public void onCommandSuccess(final VoidResult result) {
-
-						N10N.infoNotif(I18N.CONSTANTS.infoConfirmation(), I18N.CONSTANTS.saveConfirm());
-
-						// Checks if there is any update needed to the local project instance.
-						boolean refreshBanner = false;
-						boolean coreVersionUpdated = false;
-						ProjectDTO newProject = null;
-
-						for (final ValueEvent event : valueChanges) {
-							if (event.getSource() instanceof DefaultFlexibleElementDTO) {
-								newProject = updateCurrentProject(((DefaultFlexibleElementDTO) event.getSource()), event.getSingleValue(), event.isProjectCountryChanged());
-								getParentPresenter().setCurrentProject(newProject);
-								refreshBanner = true;
-							}
-							coreVersionUpdated |= event.getSourceElement().getAmendable();
-						}
-
-						valueChanges.clear();
-
-						if (refreshBanner) {
-							eventBus.fireEvent(new UpdateEvent(UpdateEvent.PROJECT_BANNER_UPDATE));
-						}
-
-						if(coreVersionUpdated) {
-							eventBus.fireEvent(new UpdateEvent(UpdateEvent.CORE_VERSION_UPDATED));
-						}
-
-						// Avoid tight coupling with other project events.
-						// FIXME (from v1.3) eventBus.fireEvent(new ProjectEvent(ProjectEvent.CHANGED, getProject().getId()));
-
-						if (newProject != null) {
-							load(newProject.getProjectModel().getProjectDetails());
-						}
-					}
-
-				}, view.getSaveButton(), new LoadingMask(view.getMainPanel()));
+			@Override
+			public void onCommandFailure(final Throwable caught) {
+				N10N.error(I18N.CONSTANTS.save(), I18N.CONSTANTS.saveError());
 			}
+
+			@Override
+			public void onCommandSuccess(final VoidResult result) {
+
+				N10N.infoNotif(I18N.CONSTANTS.infoConfirmation(), I18N.CONSTANTS.saveConfirm());
+
+				// Checks if there is any update needed to the local project instance.
+				boolean refreshBanner = false;
+				boolean coreVersionUpdated = false;
+				ProjectDTO newProject = null;
+
+				for (final ValueEvent event : valueChanges) {
+					if (event.getSource() instanceof DefaultFlexibleElementDTO) {
+						newProject = updateCurrentProject(((DefaultFlexibleElementDTO) event.getSource()), event.getSingleValue(), event.isProjectCountryChanged());
+						getParentPresenter().setCurrentProject(newProject);
+						refreshBanner = true;
+					}
+					coreVersionUpdated |= event.getSourceElement().getAmendable();
+				}
+
+				valueChanges.clear();
+
+				if (refreshBanner) {
+					eventBus.fireEvent(new UpdateEvent(UpdateEvent.PROJECT_BANNER_UPDATE));
+				}
+				
+				if(coreVersionUpdated) {
+					eventBus.fireEvent(new UpdateEvent(UpdateEvent.CORE_VERSION_UPDATED));
+				}
+				
+				// Avoid tight coupling with other project events.
+				// FIXME (from v1.3) eventBus.fireEvent(new ProjectEvent(ProjectEvent.CHANGED, getProject().getId()));
+				eventBus.fireEvent(new UpdateEvent(UpdateEvent.VALUE_UPDATE, getProject()));
+
+				if (newProject != null) {
+					load(newProject.getProjectModel().getProjectDetails());
+				}
+			}
+
+		}, view.getSaveButton(), new LoadingMask(view.getMainPanel()));
+	}
 		}, view.getSaveButton(), new LoadingMask(view.getMainPanel()));
 	}
 

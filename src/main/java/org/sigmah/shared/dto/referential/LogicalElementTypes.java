@@ -53,33 +53,60 @@ public final class LogicalElementTypes {
 	 * @return The given {@code flexibleElement} corresponding flexible element type, or an instance of
      * {@code NoElementType}.
 	 */
-		public static LogicalElementType of(final FlexibleElementDTO flexibleElement) {
-
-			final LogicalElementType type;
-
-			if (flexibleElement instanceof TextAreaElementDTO) {
-				type = TextAreaType.fromCode(((TextAreaElementDTO) flexibleElement).getType());
-			} else if (flexibleElement instanceof DefaultFlexibleElementDTO) {
-				type = ((DefaultFlexibleElementDTO) flexibleElement).getType();
-			} else if (flexibleElement instanceof DefaultContactFlexibleElementDTO) {
-				type = ((DefaultContactFlexibleElementDTO) flexibleElement).getType();
-			} else if (flexibleElement != null) {
-				final ElementTypeEnum elementType = flexibleElement.getElementType();
-				if (elementType == ElementTypeEnum.TEXT_AREA) {
-					// A case where type is null exists in production but is the result
-					// of a bug. Until the cause is found and fixed, null is handled
-					// the same as PARAGRAPH.
-					// TODO: This special case should be removed to return only the element type.
-					type = TextAreaType.PARAGRAPH;
-				} else {
-					type = elementType;
-				}
+	public static LogicalElementType of(final FlexibleElementDTO flexibleElement) {
+        
+        final LogicalElementType type;
+        
+		if (flexibleElement == null) {
+			type = NoElementType.INSTANCE;
+		} else if (flexibleElement instanceof TextAreaElementDTO) {
+            type = TextAreaType.fromCode(((TextAreaElementDTO) flexibleElement).getType());
+        } else if (flexibleElement instanceof DefaultFlexibleElementDTO) {
+            type = ((DefaultFlexibleElementDTO) flexibleElement).getType();
+        } else if (flexibleElement instanceof DefaultContactFlexibleElementDTO) {
+            type = ((DefaultContactFlexibleElementDTO) flexibleElement).getType();
+        } else {
+			final ElementTypeEnum elementType = flexibleElement.getElementType();
+			if (elementType == ElementTypeEnum.TEXT_AREA) {
+				// A case where type is null exists in production but is the result
+				// of a bug. Until the cause is found and fixed, null is handled
+				// the same as PARAGRAPH.
+				// TODO: This special case should be removed to return only the element type.
+				type = TextAreaType.PARAGRAPH;
 			} else {
-				type = null;
+				type = elementType;
 			}
-
-			return notNull(type);
+        }
+        
+        return type;
+	}
+	
+	public static LogicalElementType fromName(final String name) {
+		
+		if (name == null) { 
+			return NoElementType.INSTANCE;
 		}
+		
+		try {
+			return TextAreaType.valueOf(name);
+		} catch (IllegalArgumentException e) {
+			// Ignored.
+		}
+		
+		try {
+			return DefaultFlexibleElementType.valueOf(name);
+		} catch (IllegalArgumentException e) {
+			// Ignored.
+		}
+		
+		try {
+			return ElementTypeEnum.valueOf(name);
+		} catch (IllegalArgumentException e) {
+			// Ignored.
+		}
+		
+		return NoElementType.INSTANCE;
+	}
 	
 	/**
 	 * Returns a non-null value from the given type.
@@ -95,5 +122,5 @@ public final class LogicalElementTypes {
 			return NoElementType.INSTANCE;
 		}
 	}
-    
+	
 }

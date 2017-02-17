@@ -9,12 +9,12 @@ package org.sigmah.client.ui.presenter.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -71,15 +71,25 @@ public class ContactPresenter extends AbstractPagePresenter<ContactPresenter.Vie
 
     void addLabel(String label);
 
+    void addNameLabel(String name);
+
+    void addOrganizationLabel(String organization);
+
+    void addLabel(String label, String style);
+
     void setHeaderText(String header);
 
     void addTab(final String tabTitle, final Widget tabView);
+
+    void selectFirstTab();
   }
 
   interface ContactSubPresenter<E extends ViewInterface> extends Presenter<E> {
     String getTabHeader();
 
     void refresh(ContactDTO contactDTO);
+
+    boolean hasValueChanged();
   }
 
   private final List<? extends ContactSubPresenter> tabPresenters;
@@ -223,10 +233,10 @@ public class ContactPresenter extends AbstractPagePresenter<ContactPresenter.Vie
           view.addLabel(contactDTO.getEmail());
           break;
         case FAMILY_NAME:
-          view.addLabel(contactDTO.getName());
+          view.addNameLabel(contactDTO.getName());
           break;
         case FIRST_NAME:
-          view.addLabel(contactDTO.getFirstname());
+          view.addNameLabel(contactDTO.getFirstname());
           break;
         case LOGIN:
           view.addLabel(contactDTO.getLogin());
@@ -238,7 +248,7 @@ public class ContactPresenter extends AbstractPagePresenter<ContactPresenter.Vie
           view.addLabel(contactDTO.getMainOrgUnit().getName());
           break;
         case ORGANIZATION_NAME:
-          view.addLabel(contactDTO.getName());
+          view.addNameLabel(contactDTO.getName());
           break;
         case PHONE_NUMBER:
           view.addLabel(contactDTO.getPhoneNumber());
@@ -255,7 +265,7 @@ public class ContactPresenter extends AbstractPagePresenter<ContactPresenter.Vie
           if (contactDTO.getRoot() == null) {
             break;
           }
-          view.addLabel(contactDTO.getRoot().getName());
+          view.addOrganizationLabel(contactDTO.getRoot().getName());
           break;
         default:
           throw new IllegalStateException("Unknown DefaultContactFlexibleElementType : " + flexibleElementDTO.getType());
@@ -268,8 +278,18 @@ public class ContactPresenter extends AbstractPagePresenter<ContactPresenter.Vie
   }
 
   private void refreshTabs() {
+    view.selectFirstTab();
     for (ContactSubPresenter tabPresenter : tabPresenters) {
       tabPresenter.refresh(contactDTO);
     }
+  }
+
+  @Override
+  public boolean hasValueChanged() {
+    for (ContactSubPresenter tabPresenter : tabPresenters) {
+      if (tabPresenter.hasValueChanged())
+        return true;
+    }
+    return false;
   }
 }

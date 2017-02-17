@@ -9,12 +9,12 @@ package org.sigmah.shared.dto.element;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -50,7 +50,6 @@ import org.sigmah.offline.sync.SuccessCallback;
 import org.sigmah.shared.command.CheckContactDuplication;
 import org.sigmah.shared.command.CreateEntity;
 import org.sigmah.shared.command.DedupeContact;
-import org.sigmah.shared.command.GetContact;
 import org.sigmah.shared.command.GetContactDuplicatedProperties;
 import org.sigmah.shared.command.GetContacts;
 import org.sigmah.shared.command.result.ContactDuplicatedProperty;
@@ -72,7 +71,7 @@ import com.allen_sauer.gwt.log.client.Log;
 public class ContactListElementDTO extends FlexibleElementDTO {
   private static final long serialVersionUID = 646913359144175456L;
 
-  private static final String ENTITY_NAME = "element.ContactListElement";
+  public static final String ENTITY_NAME = "element.ContactListElement";
 
   public static final String ALLOWED_TYPE = "allowedType";
   public static final String ALLOWED_MODEL_IDS = "allowedModels";
@@ -92,12 +91,12 @@ public class ContactListElementDTO extends FlexibleElementDTO {
     });
     listComboBox.setCreateContactHandler(new ContactListComboBox.CreateContactHandler() {
       @Override
-      public void handleContactCreation(final ContactModelDTO contactModelDTO, final String login, final String firstName, final String familyName, final String organizationName, final OrgUnitDTO mainOrgUnit, final List<OrgUnitDTO> secondaryOrgUnits) {
+      public void handleContactCreation(final ContactModelDTO contactModelDTO, final String email, final String firstName, final String familyName, final String organizationName, final OrgUnitDTO mainOrgUnit, final List<OrgUnitDTO> secondaryOrgUnits) {
         CheckContactDuplication checkContactDuplication;
         if (contactModelDTO.getType() == ContactModelType.INDIVIDUAL) {
-          checkContactDuplication = new CheckContactDuplication(null, null, familyName, firstName);
+          checkContactDuplication = new CheckContactDuplication(null, email, familyName, firstName, contactModelDTO);
         } else {
-          checkContactDuplication = new CheckContactDuplication(null, null, familyName, null);
+          checkContactDuplication = new CheckContactDuplication(null, email, familyName, null, contactModelDTO);
         }
         dispatch.execute(checkContactDuplication, new AsyncCallback<ListResult<ContactDTO>>() {
           @Override
@@ -107,7 +106,7 @@ public class ContactListElementDTO extends FlexibleElementDTO {
 
           @Override
           public void onSuccess(ListResult<ContactDTO> result) {
-            final HashMap<String, Object> properties = buildPropertyMap(contactModelDTO, login, firstName, familyName, organizationName, mainOrgUnit, secondaryOrgUnits);
+            final HashMap<String, Object> properties = buildPropertyMap(contactModelDTO, email, firstName, familyName, organizationName, mainOrgUnit, secondaryOrgUnits);
             if (result == null || result.getSize() == 0) {
               createEntity(properties, listComboBox);
               return;
@@ -149,9 +148,14 @@ public class ContactListElementDTO extends FlexibleElementDTO {
                   @Override
                   protected void onCommandSuccess(ContactDTO targetedContactDTO) {
                     dedupeContactDialog.hide();
-                    eventBus.navigateRequest(Page.CONTACT_DASHBOARD.requestWith(RequestParameter.ID, targetedContactId));
+                    listComboBox.getListStore().add(targetedContactDTO);
                   }
                 });
+              }
+
+              @Override
+              public void handleCancel() {
+                dedupeContactDialog.hide();
               }
             });
             dedupeContactDialog.show();
@@ -264,10 +268,10 @@ public class ContactListElementDTO extends FlexibleElementDTO {
     });
   }
 
-  private HashMap<String, Object> buildPropertyMap(ContactModelDTO contactModelDTO, String login, String firstName, String familyName, String organizationName, OrgUnitDTO mainOrgUnit, List<OrgUnitDTO> secondaryOrgUnits) {
+  private HashMap<String, Object> buildPropertyMap(ContactModelDTO contactModelDTO, String email, String firstName, String familyName, String organizationName, OrgUnitDTO mainOrgUnit, List<OrgUnitDTO> secondaryOrgUnits) {
     HashMap<String, Object> properties = new HashMap<String, Object>();
     properties.put(ContactDTO.CONTACT_MODEL, contactModelDTO.getId());
-    properties.put(ContactDTO.LOGIN, login);
+    properties.put(ContactDTO.EMAIL, email);
     properties.put(ContactDTO.FIRSTNAME, contactModelDTO.getType() == ContactModelType.INDIVIDUAL ? firstName : null);
     properties.put(ContactDTO.NAME, contactModelDTO.getType() == ContactModelType.INDIVIDUAL ? familyName : organizationName);
     if (mainOrgUnit != null) {

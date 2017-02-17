@@ -9,12 +9,12 @@ package org.sigmah.client.ui.view.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -113,7 +113,8 @@ public class ContactRelationshipsView extends AbstractView implements ContactRel
 
     final FormPanel panel = Forms.panel();
 
-    final CheckBox allRelationsBox = Forms.checkbox(I18N.CONSTANTS.allRelations());
+    final CheckBox allRelationsBox = Forms.checkbox(I18N.CONSTANTS.allRelations(), Boolean.TRUE);
+    allRelationsBox.setEnabled(false);
     final CheckBox frameworkRelationsBox = Forms.checkbox(I18N.CONSTANTS.frameworkRelations());
     final CheckBox relationsByElementBox = Forms.checkbox(I18N.CONSTANTS.relationsByElement());
 
@@ -164,7 +165,7 @@ public class ContactRelationshipsView extends AbstractView implements ContactRel
     grid.getStore().removeAll();
     grid.getStore().add(relationships);
     grid.recalculate();
-    resizeGrid(grid, container, false);
+    resizeGrid(grid, container, true);
   }
 
   @Override
@@ -192,7 +193,7 @@ public class ContactRelationshipsView extends AbstractView implements ContactRel
     Window.addResizeHandler(new ResizeHandler() {
       @Override
       public void onResize(ResizeEvent event) {
-        resizeGrid(grid, container, false);
+        resizeGrid(grid, container, true);
       }
     });
 
@@ -205,7 +206,7 @@ public class ContactRelationshipsView extends AbstractView implements ContactRel
     List<ColumnConfig> columnConfigs = new ArrayList<ColumnConfig>();
     columnConfigs.add(new ColumnConfig(ContactRelationship.FIELD_NAME, I18N.CONSTANTS.contactRelationshipElementLabel(), 200));
     columnConfigs.add(new ColumnConfig(ContactRelationship.GROUP_NAME, I18N.CONSTANTS.contactRelationshipGroupTitle(), 200));
-    columnConfigs.add(new ColumnConfig(ContactRelationship.FIELD_NAME, I18N.CONSTANTS.contactRelationshipType(), 100));
+    columnConfigs.add(new ColumnConfig(ContactRelationship.FORMATTED_TYPE, I18N.CONSTANTS.contactRelationshipType(), 100));
 
     ColumnConfig nameColumnConfig = new ColumnConfig(ContactRelationship.FIELD_NAME, I18N.CONSTANTS.contactRelationshipName(), 250);
     nameColumnConfig.setRenderer(new GridCellRenderer<ContactRelationship>() {
@@ -267,10 +268,6 @@ public class ContactRelationshipsView extends AbstractView implements ContactRel
           height = unwrappedGridHeight;
         } else {
           height = maxHeight;
-        }
-
-        if (grid.getHeight() == height) {
-          return;
         }
 
         grid.setHeight(height);

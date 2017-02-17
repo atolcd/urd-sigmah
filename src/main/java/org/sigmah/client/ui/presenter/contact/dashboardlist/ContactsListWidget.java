@@ -119,7 +119,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 	}
 
 	public interface CreateContactHandler {
-		void handleContactCreation(ContactModelDTO contactModelDTO, String login, String firstName, String familyName, String organizationName, OrgUnitDTO mainOrgUnit, List<OrgUnitDTO> secondaryOrgUnits);
+		void handleContactCreation(ContactModelDTO contactModelDTO, String email, String firstName, String familyName, String organizationName, OrgUnitDTO mainOrgUnit, List<OrgUnitDTO> secondaryOrgUnits);
 	}
 
 	// Current contacts grid parameters.
@@ -144,12 +144,12 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 
 		createContactHandler = new CreateContactHandler() {
 			@Override
-			public void handleContactCreation(final ContactModelDTO contactModelDTO, final String login, final String firstName, final String familyName, final String organizationName, final OrgUnitDTO mainOrgUnit, final List<OrgUnitDTO> secondaryOrgUnits) {
+			public void handleContactCreation(final ContactModelDTO contactModelDTO, final String email, final String firstName, final String familyName, final String organizationName, final OrgUnitDTO mainOrgUnit, final List<OrgUnitDTO> secondaryOrgUnits) {
 				CheckContactDuplication checkContactDuplication;
 				if (contactModelDTO.getType() == ContactModelType.INDIVIDUAL) {
-					checkContactDuplication = new CheckContactDuplication(null, null, familyName, firstName);
+					checkContactDuplication = new CheckContactDuplication(null, email, familyName, firstName, contactModelDTO);
 				} else {
-					checkContactDuplication = new CheckContactDuplication(null, null, familyName, null);
+					checkContactDuplication = new CheckContactDuplication(null, email, familyName, null, contactModelDTO);
 				}
 				dispatch.execute(checkContactDuplication, new AsyncCallback<ListResult<ContactDTO>>() {
 					@Override
@@ -159,7 +159,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 
 					@Override
 					public void onSuccess(ListResult<ContactDTO> result) {
-						final HashMap<String, Object> properties = buildPropertyMap(contactModelDTO, login, firstName, familyName, organizationName, mainOrgUnit, secondaryOrgUnits);
+						final HashMap<String, Object> properties = buildPropertyMap(contactModelDTO, email, firstName, familyName, organizationName, mainOrgUnit, secondaryOrgUnits);
 						if (result == null || result.getSize() == 0) {
 							createEntity(properties);
 							return;
@@ -199,11 +199,23 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 							public void handleDedupeContact(final Integer targetedContactId, List<ContactDuplicatedProperty> selectedProperties) {
 								dispatch.execute(new DedupeContact(selectedProperties, targetedContactId), new CommandResultHandler<ContactDTO>() {
 									@Override
-									protected void onCommandSuccess(ContactDTO targetedContactDTO) {
+									protected void onCommandSuccess(final ContactDTO targetedContactDTO) {
 										dedupeContactDialog.hide();
-										eventBus.navigateRequest(Page.CONTACT_DASHBOARD.requestWith(RequestParameter.ID, targetedContactId));
+										GetContactHistory historyCmd = new GetContactHistory(targetedContactDTO.getId(), true);
+										dispatch.execute(historyCmd, new CommandResultHandler<ListResult<ContactHistory>>() {
+											@Override
+											protected void onCommandSuccess(ListResult<ContactHistory> result) {
+												ContactHistory lastChange = result.isEmpty() ? null : result.getList().get(0);
+												view.addContact(new DashboardContact(targetedContactDTO, lastChange));
+											}
+										});
 									}
 								});
+							}
+
+							@Override
+							public void handleCancel() {
+								dedupeContactDialog.hide();
 							}
 						});
 						dedupeContactDialog.show();
@@ -236,10 +248,10 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 		});
 	}
 
-	private HashMap<String, Object> buildPropertyMap(ContactModelDTO contactModelDTO, String login, String firstName, String familyName, String organizationName, OrgUnitDTO mainOrgUnit, List<OrgUnitDTO> secondaryOrgUnits) {
+	private HashMap<String, Object> buildPropertyMap(ContactModelDTO contactModelDTO, String email, String firstName, String familyName, String organizationName, OrgUnitDTO mainOrgUnit, List<OrgUnitDTO> secondaryOrgUnits) {
 		HashMap<String, Object> properties = new HashMap<String, Object>();
 		properties.put(ContactDTO.CONTACT_MODEL, contactModelDTO.getId());
-		properties.put(ContactDTO.LOGIN, login);
+		properties.put(ContactDTO.EMAIL, email);
 		properties.put(ContactDTO.FIRSTNAME, contactModelDTO.getType() == ContactModelType.INDIVIDUAL ? firstName : null);
 		properties.put(ContactDTO.NAME, contactModelDTO.getType() == ContactModelType.INDIVIDUAL ? familyName : organizationName);
 		if (mainOrgUnit != null) {
@@ -464,7 +476,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 		window.setHeadingHtml(I18N.CONSTANTS.createContactDialogTitle());
 
 		final ComboBox<ContactModelDTO> contactModelComboBox = Forms.combobox(I18N.CONSTANTS.contactModelLabel(), true, ContactModelDTO.ID, ContactModelDTO.NAME);
-		final TextField<String> loginField = Forms.text(I18N.CONSTANTS.contactLogin(), false);
+		final TextField<String> emailField = Forms.text(I18N.CONSTANTS.contactEmailAddress(), false);
 
 		final TextField<String> firstNameField = Forms.text(I18N.CONSTANTS.contactFirstName(), false);
 		final TextField<String> familyNameField = Forms.text(I18N.CONSTANTS.contactFamilyName(), false);
@@ -473,7 +485,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 		familyNameField.setVisible(false);
 		organizationNameField.setVisible(false);
 
-		final ComboBox<OrgUnitDTO> mainOrgUnitComboBox = Forms.combobox(I18N.CONSTANTS.contactMainOrgUnit(), false, OrgUnitDTO.ID, OrgUnitDTO.FULL_NAME);
+		final ComboBox<OrgUnitDTO> mainOrgUnitComboBox = Forms.combobox(I18N.CONSTANTS.contactMainOrgUnit(), true, OrgUnitDTO.ID, OrgUnitDTO.FULL_NAME);
 		final ListComboBox<OrgUnitDTO> secondaryOrgUnitsComboBox = new ListComboBox<OrgUnitDTO>(OrgUnitDTO.ID, OrgUnitDTO.FULL_NAME);
 		secondaryOrgUnitsComboBox.initComponent();
 		final AdapterField secondaryOrgUnitsFieldAdapter = Forms.adapter(I18N.CONSTANTS.contactSecondaryOrgUnits(), secondaryOrgUnitsComboBox);
@@ -490,7 +502,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 				contactModelComboBox.getStore().add(result.getList());
 			}
 		});
-		dispatch.execute(new GetOrgUnits(OrgUnitDTO.Mode.BASE), new AsyncCallback<ListResult<OrgUnitDTO>>() {
+		dispatch.execute(new GetOrgUnits(OrgUnitDTO.Mode.WITH_TREE), new AsyncCallback<ListResult<OrgUnitDTO>>() {
 			@Override
 			public void onFailure(Throwable caught) {
 				Log.error("Error while retrieving org units for contact creation dialog.");
@@ -498,8 +510,10 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 
 			@Override
 			public void onSuccess(ListResult<OrgUnitDTO> result) {
-				mainOrgUnitComboBox.getStore().add(result.getList());
-				secondaryOrgUnitsComboBox.getAvailableValuesStore().add(result.getList());
+
+				for (OrgUnitDTO orgUnitDTO : result.getData()) {
+					fillOrgUnitsComboboxes(orgUnitDTO, mainOrgUnitComboBox, secondaryOrgUnitsComboBox);
+				}
 			}
 		});
 
@@ -532,7 +546,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 
 		final FormPanel formPanel = Forms.panel(200);
 		formPanel.add(contactModelComboBox);
-		formPanel.add(loginField);
+		formPanel.add(emailField);
 		formPanel.add(firstNameField);
 		formPanel.add(familyNameField);
 		formPanel.add(organizationNameField);
@@ -547,7 +561,7 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 					return;
 				}
 
-				createContactHandler.handleContactCreation(contactModelComboBox.getValue(), loginField.getValue(),
+				createContactHandler.handleContactCreation(contactModelComboBox.getValue(), emailField.getValue(),
 						firstNameField.getValue(), familyNameField.getValue(), organizationNameField.getValue(),
 						mainOrgUnitComboBox.getValue(), secondaryOrgUnitsComboBox.getListStore().getModels());
 				window.hide();
@@ -556,5 +570,19 @@ public class ContactsListWidget extends AbstractPresenter<ContactsListWidget.Vie
 
 		window.add(formPanel);
 		window.show();
+	}
+
+	private void fillOrgUnitsComboboxes(OrgUnitDTO unit, final ComboBox<OrgUnitDTO> mainOrgUnitComboBox, final ListComboBox<OrgUnitDTO> secondaryOrgUnitsComboBox) {
+
+		mainOrgUnitComboBox.getStore().add(unit);
+		secondaryOrgUnitsComboBox.getAvailableValuesStore().add(unit);
+
+		final Set<OrgUnitDTO> children = unit.getChildrenOrgUnits();
+		if (children != null && !children.isEmpty()) {
+			for (final OrgUnitDTO child : children) {
+				fillOrgUnitsComboboxes(child, mainOrgUnitComboBox, secondaryOrgUnitsComboBox);
+			}
+		}
+
 	}
 }

@@ -69,13 +69,16 @@ import com.extjs.gxt.ui.client.widget.form.Field;
 import com.extjs.gxt.ui.client.widget.menu.Menu;
 import com.extjs.gxt.ui.client.widget.menu.MenuItem;
 import com.google.gwt.event.shared.HandlerManager;
+import java.util.Collection;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 
 import java.util.Collections;
+
 import java.util.Date;
 import java.util.Set;
 
 import org.sigmah.client.ui.widget.Loadable;
+import org.sigmah.shared.dto.computation.ComputationTriggerDTO;
 import org.sigmah.shared.dto.referential.GlobalPermissionEnum;
 import org.sigmah.shared.dto.referential.ValueEventChangeType;
 import org.sigmah.shared.util.ProjectUtils;
@@ -111,6 +114,7 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 	public static final String BANNER_POSITION = "bannerPos";
 	public static final String DISABLED_DATE = "disabledDate";
 	public static final String CREATION_DATE = "creationDate";
+	public static final String COMPUTATION_TRIGGERS = "computationTriggers";
 
 	// Provided elements.
 	protected transient HandlerManager handlerManager;
@@ -301,10 +305,8 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 	}
 
 	private Set<Integer> getOrgUnitIds() {
-		if (currentContainerDTO instanceof OrgUnitDTO) {
-			return Collections.singleton(((OrgUnitDTO) currentContainerDTO).getOrgUnitId());
-		} else if (currentContainerDTO instanceof ProjectDTO) {
-			return Collections.singleton(((ProjectDTO) currentContainerDTO).getOrgUnitId());
+		if (currentContainerDTO instanceof DefaultFlexibleElementContainer) {
+			return Collections.singleton(((DefaultFlexibleElementContainer) currentContainerDTO).getOrgUnitId());
 		} else if (currentContainerDTO instanceof ContactDTO) {
 			return ((ContactDTO) currentContainerDTO).getOrgUnitIds();
 		} else {
@@ -313,7 +315,15 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 	}
 
 	private PrivacyGroupPermissionEnum getPermission() {
+
+		if (getOrgUnitIds().contains(null)) {
+			// only draft projects does not have any org units :
+			// if you can see the project you can do what you want with it
+			return PrivacyGroupPermissionEnum.WRITE;
+		}
+
 		PrivacyGroupPermissionEnum permission = PrivacyGroupPermissionEnum.NONE;
+
 		for (Integer orgUnitId : getOrgUnitIds()) {
 			PrivacyGroupPermissionEnum privacyGroupPermission = ProfileUtils.getPermissionForOrgUnit(auth(), orgUnitId, getPrivacyGroup());
 			switch (privacyGroupPermission) {
@@ -416,16 +426,16 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 	 */
 	protected boolean userCanPerformChangeType(ValueEventChangeType changeType) {
 		final PrivacyGroupPermissionEnum permission = getPermission();
-
-		if (permission == PrivacyGroupPermissionEnum.READ) {
+		
+		if(permission == PrivacyGroupPermissionEnum.READ) {
 			return false;
+			
+		} else if(permission == PrivacyGroupPermissionEnum.WRITE) {
+			if(currentContainerDTO instanceof ProjectDTO) {
+				return userCanPerformChangeTypeOnProject(changeType, (ProjectDTO)currentContainerDTO);
 
-		} else if (permission == PrivacyGroupPermissionEnum.WRITE) {
-			if (currentContainerDTO instanceof ProjectDTO) {
-				return userCanPerformChangeTypeOnProject(changeType, (ProjectDTO) currentContainerDTO);
-
-			} else if (currentContainerDTO instanceof OrgUnitDTO) {
-				return userCanPerformChangeTypeOnOrgUnit(changeType, (OrgUnitDTO) currentContainerDTO);
+			} else if(currentContainerDTO instanceof OrgUnitDTO) {
+				return userCanPerformChangeTypeOnOrgUnit(changeType, (OrgUnitDTO)currentContainerDTO);
 
 			} else if (currentContainerDTO instanceof ContactDTO) {
 				return userCanPerformChangeTypeOnContact(changeType, (ContactDTO) currentContainerDTO);
@@ -641,6 +651,14 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 	public void setPrivacyGroup(PrivacyGroupDTO privacyGroup) {
 		set(PRIVACY_GROUP, privacyGroup);
 	}
+	
+	public Collection<ComputationTriggerDTO> getComputationTriggers() {
+		return get(COMPUTATION_TRIGGERS);
+	}
+	
+	public void setComputationTriggers(Collection<ComputationTriggerDTO> computationTriggers) {
+		set(COMPUTATION_TRIGGERS, computationTriggers);
+	}
 
 	protected void ensureHistorable() {
 		if (!isHistorable()) {
@@ -687,7 +705,7 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 	}
 
 	public ElementTypeEnum getElementType() {
-		ElementTypeEnum type = null;
+		final ElementTypeEnum type;
 		
 		// INFO: Budget elements are handled like DEFAULT elements.
 		
@@ -719,6 +737,8 @@ public abstract class FlexibleElementDTO extends AbstractModelDataEntityDTO<Inte
 			type = ElementTypeEnum.CORE_VERSION;
 		} else if (this instanceof ComputationElementDTO) {
 			type = ElementTypeEnum.COMPUTATION;
+		} else {
+			throw new UnsupportedOperationException("Type '" + getClass() + "' is not supported.");
 		}
 		return type;
 	}

@@ -9,18 +9,19 @@ package org.sigmah.shared.dto.element;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
  * #L%
  */
 
+import com.extjs.gxt.ui.client.widget.form.TextArea;
 import com.google.gwt.i18n.client.DateTimeFormat;
 import com.google.gwt.i18n.client.NumberFormat;
 import com.google.gwt.user.client.rpc.AsyncCallback;
@@ -262,6 +263,49 @@ public abstract class AbstractDefaultFlexibleElementDTO extends FlexibleElementD
     field.setFieldLabel(getLabel());
 
     return field;
+  }
+
+  protected Field<?> buildParagraphField(final String label, final String value, final int size, final boolean enabled, boolean allowBlank) {
+
+    // Builds the field and sets its value.
+    final TextField<String> textArea = new TextArea();
+    textArea.addStyleName("flexibility-textarea");
+    textArea.setAllowBlank(allowBlank);
+
+    // Sets the max length.
+      textArea.setMaxLength(size);
+      textArea.setToolTip(I18N.MESSAGES.flexibleElementTextAreaTextLength(String.valueOf(size)));
+
+    // Adds the listeners.
+    textArea.addListener(Events.OnKeyUp, new Listener<BaseEvent>() {
+
+      @Override
+      public void handleEvent(BaseEvent be) {
+
+        String rawValue = textArea.getValue();
+
+        if (rawValue == null) {
+          rawValue = "";
+        }
+
+        // The value is valid if it contains at least one
+        // non-blank character.
+        final boolean isValueOn = !rawValue.trim().equals("") && !(rawValue.length() > size);
+
+        fireEvents(rawValue, isValueOn);
+      }
+    });
+
+    // Sets the value to the field.
+    if (value != null) {
+      textArea.setValue(value);
+    }
+
+    setLabel(label);
+    textArea.setFieldLabel(getLabel());
+    textArea.setEnabled(enabled);
+
+    return textArea;
   }
 
   /**

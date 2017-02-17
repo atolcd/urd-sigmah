@@ -255,6 +255,8 @@ public class ProjectPresenter extends AbstractPresenter<ProjectPresenter.View> i
 			public void onSubMenuClick(final SubMenuItem menuItem) {
 
 				final PageRequest currentPageRequest = injector.getPageManager().getCurrentPageRequest(false);
+				Profiler.INSTANCE.startScenario(Scenario.AGENDA);	
+				Profiler.INSTANCE.markCheckpoint(Scenario.AGENDA, "Before navigateRequest");
 				eventBus.navigateRequest(menuItem.getRequest().addAllParameters(currentPageRequest.getParameters(false)));
 			}
 		});
@@ -268,7 +270,7 @@ public class ProjectPresenter extends AbstractPresenter<ProjectPresenter.View> i
 			public void selectionChanged(SelectionChangedEvent<CoreVersionAction> se) {
 				final CoreVersionAction action = se.getSelectedItem();
 
-				if(action == currentCoreVersion) {
+				if(action == currentCoreVersion || action == null) {
 					return;
 				}
 
@@ -407,7 +409,7 @@ public class ProjectPresenter extends AbstractPresenter<ProjectPresenter.View> i
 
 		// Updates sub-menu widget.
 		view.getSubMenuWidget().initializeMenu(subPageRequest.getPage(), auth());
-
+		Profiler.INSTANCE.markCheckpoint(Scenario.OPEN_PROJECT, "End initializeMenu");
 		// Updates delete button enabled state.
 		final boolean canDeleteProject = canDeleteProject();
 		view.getDeleteButton().setEnabled(canDeleteProject);
@@ -418,9 +420,10 @@ public class ProjectPresenter extends AbstractPresenter<ProjectPresenter.View> i
 
 		// Updates parent view elements.
 		loadAmendments(project, coreVersionId);
+		Profiler.INSTANCE.markCheckpoint(Scenario.OPEN_PROJECT, "End loadAmendments");
 		refreshBanner(project);
-		
-		Profiler.INSTANCE.endScenario(Scenario.OPEN_PROJECT);
+		Profiler.INSTANCE.markCheckpoint(Scenario.OPEN_PROJECT, "End refreshBanner");
+		//Profiler.INSTANCE.endScenario(Scenario.OPEN_PROJECT);
 	}
 
 	/**
@@ -744,6 +747,7 @@ public class ProjectPresenter extends AbstractPresenter<ProjectPresenter.View> i
 					final DefaultFlexibleElementDTO defaultElement = (DefaultFlexibleElementDTO) element;
 					defaultElement.setService(dispatch);
 					defaultElement.setAuthenticationProvider(injector.getAuthenticationProvider());
+					defaultElement.setEventBus(eventBus);
 					defaultElement.setCache(injector.getClientCache());
 					defaultElement.setCurrentContainerDTO(project);
 
@@ -857,16 +861,16 @@ public class ProjectPresenter extends AbstractPresenter<ProjectPresenter.View> i
 
 				if (indicatorField.getValue()) {
 					if (logFrameField.getValue()) {
-						type = ExportType.PROJECT_SYNTHESIS_LOGFRAME_INDICATORS;
+					type = ExportType.PROJECT_SYNTHESIS_LOGFRAME_INDICATORS;
 					} else {
-						type = ExportType.PROJECT_SYNTHESIS_INDICATORS;
+					type = ExportType.PROJECT_SYNTHESIS_INDICATORS;
 					}
 				} else {
 					if (logFrameField.getValue()) {
-						type = ExportType.PROJECT_SYNTHESIS_LOGFRAME;
-					} else {
-						type = ExportType.PROJECT_SYNTHESIS;
-					}
+					type = ExportType.PROJECT_SYNTHESIS_LOGFRAME;
+				} else {
+					type = ExportType.PROJECT_SYNTHESIS;
+				}
 				}
 
 				urlBuilder.addParameter(RequestParameter.ID, project.getId());

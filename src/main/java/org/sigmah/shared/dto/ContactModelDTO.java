@@ -9,12 +9,12 @@ package org.sigmah.shared.dto;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -354,6 +354,22 @@ public class ContactModelDTO extends AbstractModelDataEntityDTO<Integer> impleme
           element.setContainerModel(getDetails());
 
           final ElementTypeEnum type = element.getElementType();
+          if (element instanceof DefaultContactFlexibleElementDTO) {
+            DefaultContactFlexibleElementDTO defaultElement = (DefaultContactFlexibleElementDTO) element;
+            if (getType() == ContactModelType.INDIVIDUAL) {
+              switch (defaultElement.getType()) {
+                case ORGANIZATION_NAME:
+                  continue;
+              }
+            } else {
+              switch (defaultElement.getType()) {
+                case FAMILY_NAME:
+                case FIRST_NAME:
+                  continue;
+              }
+            }
+          }
+
           if (ElementTypeEnum.DEFAULT_CONTACT == type
               || ElementTypeEnum.CHECKBOX == type
               || ElementTypeEnum.TEXT_AREA == type

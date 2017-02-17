@@ -9,12 +9,12 @@ package org.sigmah.server.handler;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -23,6 +23,7 @@ package org.sigmah.server.handler;
 
 import com.google.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.sigmah.server.dao.ContactDAO;
@@ -52,8 +53,15 @@ public class GetContactsHandler extends AbstractCommandHandler<GetContacts, List
       contacts = contactDAO.findByIds(command.getContactIds());
     }
 
+    List<ContactDTO> contactDTOs = new ArrayList<>();
+    for (Contact contact : contacts) {
+      if (!contact.isDeleted()) {
+        contactDTOs.add(mapper().map(contact, ContactDTO.class));
+      }
+    }
+
     // FIXME: Add ContactDTO.Mode.MAIN_INFORMATION when dozer 5.5.2 will be ready
     // see https://github.com/DozerMapper/dozer/commit/5e179bb68c91e60d63bf9f44bf64b7ca70f61520
-    return new ListResult<>(mapper().mapCollection(contacts, ContactDTO.class));
+    return new ListResult<>(contactDTOs);
   }
 }

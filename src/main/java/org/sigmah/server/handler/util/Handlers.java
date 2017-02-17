@@ -25,6 +25,8 @@ package org.sigmah.server.handler.util;
 
 import java.util.*;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.map.HashedMap;
 import org.sigmah.server.dispatch.CommandHandler;
 import org.sigmah.server.domain.Contact;
 import org.sigmah.server.domain.OrgUnit;
@@ -43,10 +45,9 @@ import org.sigmah.shared.dto.profile.PrivacyGroupDTO;
 import org.sigmah.shared.dto.profile.ProfileDTO;
 import org.sigmah.shared.dto.referential.GlobalPermissionEnum;
 import org.sigmah.shared.dto.referential.PrivacyGroupPermissionEnum;
+import org.sigmah.shared.security.UnauthorizedAccessException;
 import org.sigmah.shared.util.Month;
-
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.map.HashedMap;
+import org.sigmah.shared.util.OrgUnitUtils;
 
 /**
  * Convenient methods for {@link CommandHandler} implementations.
@@ -64,13 +65,13 @@ public final class Handlers {
 
 		final Calendar c1 = Calendar.getInstance();
 		c1.setTime(date1);
-		if (c1.get(Calendar.DAY_OF_MONTH) != 1) {
+		if (c1.get(Calendar.DAY_OF_MONTH) != 5) {
 			return null;
 		}
 
 		final Calendar c2 = Calendar.getInstance();
 		c2.setTime(date2);
-		if (c2.get(Calendar.DAY_OF_MONTH) != c2.getActualMaximum(Calendar.DAY_OF_MONTH)) {
+		if (c2.get(Calendar.DAY_OF_MONTH) != c2.getActualMaximum(Calendar.DAY_OF_MONTH) - 5) {
 			return null;
 		}
 
@@ -246,23 +247,22 @@ public final class Handlers {
 	}
 
 	public static boolean isProjectAccessible(Project project, User user, boolean edition) {
+		
 		// Checks that the project is not deleted
 		if (project.isDeleted()) {
 			return false;
 		}
 
 		// Owner.
-		if (project.getOwner() != null) {
-			if (project.getOwner().getId().equals(user.getId())) {
-				return true;
-			}
+		final User owner = project.getOwner();
+		if (owner != null && owner.getId().equals(user.getId())) {
+			return true;
 		}
 
 		// Manager.
-		if (project.getManager() != null) {
-			if (project.getManager().getId().equals(user.getId())) {
-				return true;
-			}
+		final User manager = project.getManager();
+		if (manager != null && manager.getId().equals(user.getId())) {
+			return true;
 		}
 
 		OrgUnitProfile targetedOrgUnitProfile = getTargetedOrgUnitProfile(project.getOrgUnit().getId(), user);
@@ -397,6 +397,76 @@ public final class Handlers {
 		return false;
 	}
 
+	/**
+	 * Utiliy to check the user's grant for a given permission.
+	 * 
+	 * @param userOrgUnit
+	 *			Link between user and orgunit to check.
+	 * @param permission
+	 *			Permission to search.
+	 * @return <code>true</code> if the given user is granted the given permission,
+	 * <code>false</code> otherwise.
+	 */
+	public static boolean isGranted(final OrgUnitProfile userOrgUnit, final GlobalPermissionEnum permission) {
+		List<Profile> profiles = userOrgUnit.getProfiles();
+
+		for (final Profile profile : profiles) {
+			if (profile.getGlobalPermissions() != null) {
+				for (final GlobalPermission p : profile.getGlobalPermissions()) {
+					if (p.getPermission().equals(permission)) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	public static boolean isGranted(List<OrgUnitProfile> userUnits, GlobalPermissionEnum permission) {
+		for (OrgUnitProfile userUnit : userUnits) {
+			if (isGranted(userUnit, permission)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static boolean isGranted(List<OrgUnitProfile> userUnits, OrgUnit targetOrgUnit, GlobalPermissionEnum permission) {
+		for (OrgUnitProfile userUnit : userUnits) {
+			if (!OrgUnitUtils.areOrgUnitsEqualOrParent(targetOrgUnit, userUnit.getOrgUnit().getId())) {
+				continue;
+			}
+			if (isGranted(userUnit, permission)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Asserts that the user has permission to modify the structure of the given database.
+	 * 
+	 * NOTE: Design privilege from Activity Info have been removed.
+	 * To satisfy this check a user must now be able to view the given database
+	 * and must have the {@link GlobalPermissionEnum#EDIT_INDICATOR} permission.
+	 * 
+	 * @param user
+	 *          The user for whom to check permissions.
+	 * @param project
+	 *          The project the user is trying to modify.
+	 * @throws UnauthorizedAccessException
+	 *           If the user does not have design permission.
+	 */
+	public static void assertDesignPrivileges(final User user, final Project project) throws UnauthorizedAccessException {
+		
+		if (!isGranted(user.getOrgUnitsWithProfiles(), GlobalPermissionEnum.EDIT_INDICATOR)) {
+			throw new UnauthorizedAccessException("Access denied to project '" + project.getId() + "'.");
+		}
+		if (!isProjectVisible(project, user)) {
+			throw new UnauthorizedAccessException("Project '" + project.getId() + "' is not visible by user '" + user.getEmail() + "'.");
+		}
+	}
 
 	private static OrgUnitProfile getTargetedOrgUnitProfile(Integer orgUnitIdRelatedToContainer, User user) {
 		// let's get the nearest OrgUnitProfile from the target OrgUnit

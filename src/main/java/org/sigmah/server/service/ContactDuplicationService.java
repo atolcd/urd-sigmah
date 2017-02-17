@@ -9,18 +9,19 @@ package org.sigmah.server.service;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
  * #L%
  */
 
+import com.google.gwt.thirdparty.guava.common.base.Strings;
 import com.google.inject.Inject;
 
 import java.util.ArrayList;
@@ -49,12 +50,15 @@ public class ContactDuplicationService {
   }
 
   public List<ContactDuplicatedProperty> extractProperties(Contact newContact, Contact oldContact, Language language) {
-    if (!Objects.equals(newContact.getContactModel().getId(), oldContact.getContactModel().getId())) {
-      throw new IllegalStateException("Uncompatible contact models : " + newContact.getContactModel().getId() + " and " + oldContact.getContactModel().getId());
-    }
 
     List<ContactDuplicatedProperty> properties = new ArrayList<>();
     for (LayoutGroup group : newContact.getContactModel().getDetails().getLayout().getGroups()) {
+
+      if (group.getHasIterations()) {
+        // iterative groups are not handled by the dedupe mechanism
+        continue;
+      }
+
       for (LayoutConstraint layoutConstraint : group.getConstraints()) {
         FlexibleElement element = layoutConstraint.getElement();
 
@@ -83,10 +87,10 @@ public class ContactDuplicationService {
           formattedOldValue = modelPropertyService.getFormattedValue(element, oldValue.getValue(), language);
         }
 
-        if ("".equals(serializedOldValue)) {
+        if (Strings.isNullOrEmpty(serializedOldValue)) {
           serializedOldValue = null;
         }
-        if ("".equals(serializedNewValue)) {
+        if (Strings.isNullOrEmpty(serializedNewValue)) {
           serializedNewValue = null;
         }
 

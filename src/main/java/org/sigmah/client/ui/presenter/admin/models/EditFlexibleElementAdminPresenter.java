@@ -23,14 +23,7 @@ package org.sigmah.client.ui.presenter.admin.models;
  */
 
 
-import com.google.gwt.event.dom.client.ClickEvent;
-import com.google.gwt.event.dom.client.ClickHandler;
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.google.gwt.user.client.ui.Anchor;
-import com.google.gwt.user.client.ui.FlexTable;
-import com.google.inject.ImplementedBy;
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
+import com.allen_sauer.gwt.log.client.Log;
 import com.extjs.gxt.ui.client.data.BaseModelData;
 import com.extjs.gxt.ui.client.event.BaseEvent;
 import com.extjs.gxt.ui.client.event.ButtonEvent;
@@ -51,10 +44,14 @@ import com.extjs.gxt.ui.client.widget.form.Field;
 import com.extjs.gxt.ui.client.widget.form.SimpleComboBox;
 import com.extjs.gxt.ui.client.widget.form.TextField;
 import com.extjs.gxt.ui.client.widget.form.Validator;
-
-import java.util.*;
-import java.util.Map.Entry;
-
+import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.event.dom.client.ClickHandler;
+import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.google.gwt.user.client.ui.Anchor;
+import com.google.gwt.user.client.ui.FlexTable;
+import com.google.inject.ImplementedBy;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.sigmah.client.dispatch.CommandResultHandler;
 import org.sigmah.client.dispatch.monitor.LoadingMask;
 import org.sigmah.client.event.UpdateEvent;
@@ -96,7 +93,18 @@ import org.sigmah.shared.dto.OrgUnitBannerDTO;
 import org.sigmah.shared.dto.ProjectBannerDTO;
 import org.sigmah.shared.dto.base.AbstractModelDataEntityDTO;
 import org.sigmah.shared.dto.category.CategoryTypeDTO;
-import org.sigmah.shared.dto.element.*;
+import org.sigmah.shared.dto.element.BudgetElementDTO;
+import org.sigmah.shared.dto.element.BudgetRatioElementDTO;
+import org.sigmah.shared.dto.element.BudgetSubFieldDTO;
+import org.sigmah.shared.dto.element.ComputationElementDTO;
+import org.sigmah.shared.dto.element.ContactListElementDTO;
+import org.sigmah.shared.dto.element.FilesListElementDTO;
+import org.sigmah.shared.dto.element.FlexibleElementDTO;
+import org.sigmah.shared.dto.element.QuestionChoiceElementDTO;
+import org.sigmah.shared.dto.element.QuestionElementDTO;
+import org.sigmah.shared.dto.element.ReportElementDTO;
+import org.sigmah.shared.dto.element.ReportListElementDTO;
+import org.sigmah.shared.dto.element.TextAreaElementDTO;
 import org.sigmah.shared.dto.layout.LayoutConstraintDTO;
 import org.sigmah.shared.dto.layout.LayoutDTO;
 import org.sigmah.shared.dto.layout.LayoutGroupDTO;
@@ -111,7 +119,19 @@ import org.sigmah.shared.dto.referential.TextAreaType;
 import org.sigmah.shared.dto.report.ReportModelDTO;
 import org.sigmah.shared.util.Collections;
 
-import com.allen_sauer.gwt.log.client.Log;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeSet;
+import org.sigmah.shared.computation.dependency.SingleDependency;
 
 /**
  * Presenter in charge of creating/editing a flexible element.
@@ -192,12 +212,19 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 		FlexTable getBudgetFields();
 
 		FlexTable getRatioFlexTable();
+		
+		ComboBox<FlexibleElementDTO> getBudgetSubFieldSpentCombo();
+	    ComboBox<FlexibleElementDTO> getBudgetSubFieldPlannedCombo();
 
 		ComboBox<BudgetSubFieldDTO> getUpBudgetSubFieldCombo();
 
 		ComboBox<BudgetSubFieldDTO> getDownBudgetSubFieldCombo();
 
 		ListStore<BudgetSubFieldDTO> getUpBudgetSubFieldStore();
+		
+		ListStore<FlexibleElementDTO> getBudgetSubFieldSpentStore();
+		
+		ListStore<FlexibleElementDTO> getBudgetSubFieldPlannedStore();
 
 		ListStore<BudgetSubFieldDTO> getDownBudgetSubFieldStore();
 
@@ -651,8 +678,10 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 		final LogicalElementType type = LogicalElementTypes.of(flexibleElement);
 		final boolean defaultFlexibleElement = type.toDefaultFlexibleElementType() != null;
 
-		view.getNameField().setVisible(!defaultFlexibleElement);
-		view.getNameReadOnlyField().setVisible(defaultFlexibleElement);
+		boolean isBudgetRatioElement = type == DefaultFlexibleElementType.BUDGET_RATIO;
+		
+		view.getNameField().setVisible(!defaultFlexibleElement || isBudgetRatioElement);
+		view.getNameReadOnlyField().setVisible(defaultFlexibleElement && !isBudgetRatioElement);
 		view.getTypeField().setEnabled(flexibleElement == null);
 		view.getExportableField().setValue(true);
 
@@ -888,25 +917,49 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 
 		if (type == ElementTypeEnum.COMPUTATION) {
 			// Related flexible elements code grid.
-			final ListStore<FlexibleElementDTO> store = view.getStore();
+			addNumberTypeToStore(view.getStore());
+		} else if (type == ElementTypeEnum.CONTACT_LIST) {
+			loadContactListOptions((ContactListElementDTO) flexibleElement);
+		}
+		if (type == DefaultFlexibleElementType.BUDGET_RATIO) {
+			addNumberTypeToStore(view.getBudgetSubFieldSpentStore(), view.getBudgetSubFieldPlannedStore());
+		}
+		if (flexibleElement instanceof BudgetRatioElementDTO) {
+			
+			final BudgetRatioElementDTO budgetRatioElementDTO = (BudgetRatioElementDTO) flexibleElement;
+			
+			if (budgetRatioElementDTO.getSpentBudget() != null) {
+				view.getBudgetSubFieldSpentCombo().setSelection(
+						java.util.Collections.singletonList(budgetRatioElementDTO.getSpentBudget()));
+			}
+			
+			if (budgetRatioElementDTO.getPlannedBudget() != null) {
+				view.getBudgetSubFieldPlannedCombo().setSelection(
+						java.util.Collections.singletonList(budgetRatioElementDTO.getPlannedBudget()));
+			}
+			
+		}
+	}
+	
+	private void addNumberTypeToStore(ListStore<FlexibleElementDTO>... stores){
+		for (ListStore<FlexibleElementDTO> store : stores) {
 			store.removeAll();
-
-			for (final FlexibleElementDTO otherElement : otherElements) {
+		}
+		for (final FlexibleElementDTO otherElement : otherElements) {
 				// fields in iterative groups cannot be part of formula
 				if(otherElement.getGroup().getHasIterations()) {
 					continue;
 				}
 
-				final LogicalElementType otherType = LogicalElementTypes.of(otherElement);
-				final ElementTypeEnum otherElementType = otherType.toElementTypeEnum();
+			final LogicalElementType otherType = LogicalElementTypes.of(otherElement);
+			final ElementTypeEnum otherElementType = otherType.toElementTypeEnum();
 
-				if ((otherElementType == ElementTypeEnum.TEXT_AREA && otherType.toTextAreaType() == TextAreaType.NUMBER)
-						|| otherElementType == ElementTypeEnum.COMPUTATION) {
+			if ((otherElementType == ElementTypeEnum.TEXT_AREA && otherType.toTextAreaType() == TextAreaType.NUMBER)
+					|| otherElementType == ElementTypeEnum.COMPUTATION) {
+				for (ListStore<FlexibleElementDTO> store : stores) {
 					store.add(otherElement);
 				}
 			}
-		} else if (type == ElementTypeEnum.CONTACT_LIST) {
-			loadContactListOptions((ContactListElementDTO) flexibleElement);
 		}
 	}
 
@@ -922,7 +975,6 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 
 		view.setTextAreaSpecificFieldsVisibility(textAreaType);
 
-		view.getCodeField().setEnabled(!isUpdateAndUnderMaintenance());
 		view.getMinDateField().setEnabled(!isUpdateAndUnderMaintenance());
 		view.getMaxDateField().setEnabled(!isUpdateAndUnderMaintenance());
 		view.getMinLimitField().setEnabled(!isUpdateAndUnderMaintenance());
@@ -950,11 +1002,12 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 	private void loadStaticValues() {
 
 		// Loads element types.
-		view.getTypeField().getStore().removeAll();
+		final ListStore<TypeModel> store = view.getTypeField().getStore();
+		store.removeAll();
 
 		for (final LogicalElementType type : getLogicalElementTypes()) {
 			if (type != ElementTypeEnum.DEFAULT && type != ElementTypeEnum.INDICATORS) {
-				view.getTypeField().getStore().add(new TypeModel(type));
+				store.add(new TypeModel(type));
 			}
 		}
 
@@ -1005,7 +1058,9 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 		});
 
 		for (final ElementTypeEnum type : ElementTypeEnum.values()) {
-			types.add(type);
+			if (type != ElementTypeEnum.TEXT_AREA) {
+				types.add(type);
+			}
 		}
 
 		for (final TextAreaType type : TextAreaType.values()) {
@@ -1400,7 +1455,8 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 		// A field cannot be in an iterative group AND in a computation field
 		// + a computation field cannot be in an iterative group
 		// + a core field cannot be in an iterative group
-		if(group.getHasIterations()) {
+		LayoutGroupDTO groupToTest = group == null ? flexibleElement.getGroup() : group;
+		if(groupToTest != null && groupToTest.getHasIterations() != null && groupToTest.getHasIterations()) {
 			if(type == ElementTypeEnum.COMPUTATION) {
 				N10N.warn(I18N.CONSTANTS.cannotAddComputationElementToIterativeGroup());
 				return;
@@ -1446,6 +1502,10 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 		final Boolean multiple = view.getMultipleChoicesField().getValue();
 		final CategoryTypeDTO category = view.getCategoryTypeField().getValue();
 		
+		final FlexibleElementDTO budgetSpent = view.getBudgetSubFieldSpentCombo().getValue();
+		final FlexibleElementDTO budgetPlanned = view.getBudgetSubFieldPlannedCombo().getValue();
+		
+		
 		final String computationRule = Computations.formatRuleForServer(view.getFormulaField().getValue(), otherElements);
 
 		final Number contactListLimit = view.getContactListLimit().getValue();
@@ -1478,6 +1538,9 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 		newFieldProperties.put(AdminUtil.PROP_FX_LENGTH, length);
 		newFieldProperties.put(AdminUtil.PROP_FX_MAX_LIMIT, maxLimit);
 		newFieldProperties.put(AdminUtil.PROP_FX_MIN_LIMIT, minLimit);
+		
+		newFieldProperties.put(AdminUtil.PROP_BUDGET_SPENT, budgetSpent);
+		newFieldProperties.put(AdminUtil.PROP_BUDGET_PLANNED, budgetPlanned);
 		
 		if (textAreaType == TextAreaType.DATE) {
 			newFieldProperties.put(AdminUtil.PROP_FX_MAX_LIMIT, maxLimitDate);
@@ -1673,16 +1736,20 @@ public class EditFlexibleElementAdminPresenter extends AbstractPagePresenter<Edi
 	 * @return A collection of every computation element using the given element.
 	 */
 	private Collection<ComputationElementDTO> getComputationElementsUsingField(final FlexibleElementDTO flexibleElement) {
+		
+		// FIXME: Should also search in the database since other project models may reference the given element.
 
 		final ArrayList<ComputationElementDTO> computationElements = new ArrayList<ComputationElementDTO>();
 		final List<FlexibleElementDTO> allElements = view.getStore().getModels();
+		
+		final SingleDependency dependency = new SingleDependency(flexibleElement);
 
 		for (final FlexibleElementDTO other : otherElements) {
 			if (other instanceof ComputationElementDTO) {
 				final ComputationElementDTO computationElement = (ComputationElementDTO) other;
 
 				final Computation computation = Computations.parse(computationElement.getRule(), allElements);
-				if (computation.getDependencies().contains(flexibleElement)) {
+				if (computation.getDependencies().contains(dependency)) {
 					computationElements.add(computationElement);
 				}
 			}

@@ -9,12 +9,12 @@ package org.sigmah.client.ui.presenter.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -30,6 +30,8 @@ import com.extjs.gxt.ui.client.widget.grid.Grid;
 import java.util.List;
 
 import org.sigmah.client.dispatch.CommandResultHandler;
+import org.sigmah.client.event.UpdateEvent;
+import org.sigmah.client.event.handler.UpdateHandler;
 import org.sigmah.client.i18n.I18N;
 import org.sigmah.client.inject.Injector;
 import org.sigmah.client.ui.presenter.base.AbstractPresenter;
@@ -64,6 +66,24 @@ public class ContactHistoryPresenter extends AbstractPresenter<ContactHistoryPre
   }
 
   @Override
+  public void onBind() {
+
+
+    // Contact delete event handler.
+    registerHandler(eventBus.addHandler(UpdateEvent.getType(), new UpdateHandler() {
+
+      @Override
+      public void onUpdate(final UpdateEvent event) {
+
+        if (event.concern(UpdateEvent.CONTACT_UPDATE)) {
+          final ContactDTO contact = event.getParam(0);
+          refresh(contact);
+        }
+      }
+    }));
+  }
+
+  @Override
   public void refresh(ContactDTO contactDTO) {
     view.setImageProvider(imageProvider);
     dispatch.execute(new GetContactHistory(contactDTO.getId()), new CommandResultHandler<ListResult<ContactHistory>>() {
@@ -72,5 +92,9 @@ public class ContactHistoryPresenter extends AbstractPresenter<ContactHistoryPre
         view.updateGridData(result.getList());
       }
     });
+  }
+
+  public boolean hasValueChanged() {
+    return false;
   }
 }

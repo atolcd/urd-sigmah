@@ -9,12 +9,12 @@ package org.sigmah.client.ui.widget.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -66,6 +66,7 @@ public class DedupeContactDialog extends Window {
   private Grid<ContactDuplicatedProperty> duplicatedPropertiesGrid;
   private Button firstStepMainButton;
   private Button secondStepMainButton;
+  private Button cancelSecondStepButton;
   private LayoutContainer secondStepContainer;
   private CardLayout cardLayout;
 
@@ -109,9 +110,12 @@ public class DedupeContactDialog extends Window {
 
     duplicatedPropertiesGrid = generateDuplicatedPropertiesGrid();
 
-    secondStepMainButton = generateFirstStepMainButton();
+    secondStepMainButton = generateSecondStepMainButton();
     LayoutContainer secondStepButtonsContainer = Layouts.border();
     secondStepButtonsContainer.add(secondStepMainButton, Layouts.borderLayoutData(Style.LayoutRegion.EAST));
+
+    cancelSecondStepButton = generateCancelSecondStepButton();
+    secondStepButtonsContainer.add(cancelSecondStepButton, Layouts.borderLayoutData(Style.LayoutRegion.WEST));
 
     secondStepContainer = Layouts.border();
     secondStepContainer.setScrollMode(Style.Scroll.AUTOY);
@@ -144,10 +148,26 @@ public class DedupeContactDialog extends Window {
     } else {
       button = new Button(I18N.CONSTANTS.dedupeContactUpdateIndependently());
     }
+    return button;
+  }
+
+  private Button generateSecondStepMainButton() {
+    Button button = new Button(I18N.CONSTANTS.dedupeContactUpdateButton());
     button.addSelectionListener(new SelectionListener<ButtonEvent>() {
       @Override
       public void componentSelected(ButtonEvent ce) {
         secondStepHandler.handleDedupeContact(selectedContact.getId(), selectedProperties);
+      }
+    });
+    return button;
+  }
+
+  private Button generateCancelSecondStepButton() {
+    Button button = new Button(I18N.CONSTANTS.cancel());
+    button.addSelectionListener(new SelectionListener<ButtonEvent>() {
+      @Override
+      public void componentSelected(ButtonEvent ce) {
+        secondStepHandler.handleCancel();
       }
     });
     return button;
@@ -281,5 +301,7 @@ public class DedupeContactDialog extends Window {
     void downloadImage(String id, Image image);
 
     void handleDedupeContact(Integer targetedContactId, List<ContactDuplicatedProperty> selectedProperties);
+
+    void handleCancel();
   }
 }

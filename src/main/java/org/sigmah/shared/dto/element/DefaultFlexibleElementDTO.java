@@ -92,6 +92,23 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 	protected transient DefaultFlexibleElementContainer container;
 
 	/**
+	 * Creates a new default flexible element DTO.
+	 */
+	public DefaultFlexibleElementDTO() {
+		// Empty constructor.
+	}
+	
+	/**
+	 * Creates a new default flexible DTO with the given type.
+	 * 
+	 * @param type 
+	 *			Type of the default flexible element DTO to create.
+	 */
+	public DefaultFlexibleElementDTO(final DefaultFlexibleElementType type) {
+		setType(type);
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -258,7 +275,7 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 		// These elements don't have any value.
 		return true;
 	}
-	
+
 	/**
 	 * Creates the code field.
 	 * 
@@ -324,7 +341,7 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 	private Field<?> buildEndDateField(String date, boolean enabled) {
 		return buildDateField(I18N.CONSTANTS.projectEndDate(), new Date(Long.parseLong(date)), enabled);
 	}
-
+	
 	/**
 	 * Creates the owner field.
 	 * This field is always read-only.
@@ -495,13 +512,16 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 
 		return field;
 	}
-
-	@Override
+	
+				@Override
 	protected void addOrgUnitSelectionChangedListener(final ComboBox<OrgUnitDTO> comboBox) {
 		comboBox.addSelectionChangedListener(new SelectionChangedListener<OrgUnitDTO>() {
 			
 			@Override
 			public void selectionChanged(final SelectionChangedEvent<OrgUnitDTO> se) {
+				
+				final boolean countryChanged = isProjectCountryChanged(se);
+				
 				// Action called to save the new value.
 				final Runnable fireChangeEventRunnable = new Runnable() {
 					
@@ -522,7 +542,7 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 						
 						if (value != null) {
 							// Fires value change event.
-							handlerManager.fireEvent(new ValueEvent(DefaultFlexibleElementDTO.this, value));
+							handlerManager.fireEvent(new ValueEvent(DefaultFlexibleElementDTO.this, value, countryChanged));
 						}
 						
 						// Required element ?
@@ -532,40 +552,18 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 					}
 				};
 				
-				if (container instanceof ProjectDTO) {
-					Log.debug("OrgUnit in project details.");
-					
-					final ProjectDTO currentProject = (ProjectDTO) container;
+				if (countryChanged) {
+					Log.debug("Country changed.");
 					
 					final Filter filter = new Filter();
-					filter.addRestriction(DimensionType.Database, currentProject.getId());
+					filter.addRestriction(DimensionType.Database, container.getId());
 					
-					GetSitesCount getSitesCountCmd = new GetSitesCount(filter);
-					
-					dispatch.execute(getSitesCountCmd, new CommandResultHandler<SiteResult>() {
-						
-						@Override
-						public void onCommandFailure(final Throwable caught) {
-							Log.error("[getSitesCountCmd] Error while getting the count of sites.", caught);
-						}
+					dispatch.execute(new GetSitesCount(filter), new CommandResultHandler<SiteResult>() {
 						
 						@Override
 						public void onCommandSuccess(final SiteResult result) {
 							
-							// Gets the selected choice.
-							final OrgUnitDTO choice = se.getSelectedItem();
-							
-							// Current poject's country
-							final CountryDTO projectCountry = currentProject.getCountry();
-							
-							// New OrgUnit's country
-							final CountryDTO orgUnitCountry = choice != null ? choice.getOfficeLocationCountry() : null;
-							
-							if (result != null
-								&& result.getSiteCount() > 0
-								&& projectCountry != null
-								&& orgUnitCountry != null
-								&& projectCountry != orgUnitCountry) {
+							if (result != null && result.getSiteCount() > 0) {
 								
 								// If the new OrgUnit's country different from the current country of project inform users
 								// that it will continue use the country of project not new OrgUnit's.
@@ -584,7 +582,7 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 									// NO callback.
 									@Override
 									public void onAction() {
-										comboBox.setValue(orgUnitsStore.findModel(OrgUnitDTO.ID, currentProject.getOrgUnitId()));
+										comboBox.setValue(orgUnitsStore.findModel(OrgUnitDTO.ID, container.getOrgUnitId()));
 									}
 								});
 								
@@ -596,13 +594,50 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 					
 				} else {
 					// Non project container
-					Log.debug("OrgUnit in non-project.");
+					Log.debug("Country did not changed.");
 					fireChangeEventRunnable.run();
 				}
 			}
 		});
 	}
 	
+	/**
+	 * Checks if the country of the enclosing project was changed.
+	 * 
+	 * @param event
+	 *			Change event fired by an OrgUnit default flexible element.
+	 * @return <code>true</code> if the container is a project and if the new
+	 * org unit has a different country, <code>false</code> otherwise.
+	 */
+	private boolean isProjectCountryChanged(final SelectionChangedEvent<OrgUnitDTO> event) {
+		
+		if (container instanceof ProjectDTO) {
+			// Gets the selected choice.
+			final OrgUnitDTO choice = event.getSelectedItem();
+
+			// Current poject's country
+			final CountryDTO projectCountry = container.getCountry();
+
+			// New OrgUnit's country
+			final CountryDTO orgUnitCountry = choice != null ? choice.getOfficeLocationCountry() : null;
+			
+			if (projectCountry == null) {
+				return orgUnitCountry != null;
+			}
+			else if (orgUnitCountry == null) {
+				// Rejecting changes to null values.
+				return false;
+			}
+			else {
+				return !projectCountry.equals(orgUnitCountry);
+			}
+		}
+		else {
+			// No country change if the container is not a project.
+			return false;
+		}
+	}
+
 	private String formatManager(String value) {
 		if (cache != null) {
 			try {
@@ -671,14 +706,14 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 			onLoad.onAction();
 		}
 	}
-
-	@Override
+	
+				@Override
 	protected Field<?> buildCountryField(CountryDTO country, boolean enabled) {
 		// COUNTRY of project should not be changeable except OrgUnit's
 		enabled &= !(currentContainerDTO instanceof ProjectDTO);
 
 		return super.buildCountryField(country, enabled);
-	}
+				}
 
 	@Override
 	protected Field<?> buildOrgUnitField(String label, Integer orgUnitId, boolean enabled) {
@@ -686,7 +721,7 @@ public class DefaultFlexibleElementDTO extends AbstractDefaultFlexibleElementDTO
 		enabled &= !(container instanceof OrgUnitDTO);
 
 		return super.buildOrgUnitField(label, orgUnitId, enabled);
-	}
+   }
 
 	@Override
 	public Object renderHistoryToken(HistoryTokenListDTO token) {

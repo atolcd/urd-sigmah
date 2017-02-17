@@ -9,12 +9,12 @@ package org.sigmah.server.service;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -24,6 +24,7 @@ package org.sigmah.server.service;
 import com.google.inject.Inject;
 
 import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 
 import org.sigmah.server.dao.ContactDAO;
@@ -59,9 +60,34 @@ public class ContactService extends AbstractEntityService<Contact, Integer, Cont
     return contactDAO.persist(contact, context.getUser());
   }
 
+  public Contact createVirtual(PropertyMap properties, UserDispatch.UserExecutionContext context) throws CommandException {
+    Contact contact = generateContact(properties);
+    if (contact == null) {
+      return null;
+    }
+
+    return contact;
+  }
+
   @Override
   public Contact update(Integer entityId, PropertyMap changes, UserDispatch.UserExecutionContext context) throws CommandException {
-    throw new UnsupportedOperationException();
+
+    for (Map.Entry<String, Object> entry : changes.entrySet()) {
+      if ("dateDeleted".equals(entry.getKey())) {
+
+        // Get the current contact
+        Contact contact = em().find(Contact.class, entityId);
+
+        // Mark the project in the state "deleted" (but don't delete it
+        // really)
+        contact.delete();
+
+        // Save
+        em().merge(contact);
+      }
+    }
+
+    return em().find(Contact.class, entityId);
   }
 
   public Contact generateContact(PropertyMap properties) {
@@ -69,7 +95,7 @@ public class ContactService extends AbstractEntityService<Contact, Integer, Cont
     if (contactModelId == null) {
       return null;
     }
-    String login = properties.get(ContactDTO.LOGIN);
+    String email = properties.get(ContactDTO.EMAIL);
     String firstName = properties.get(ContactDTO.FIRSTNAME);
     String name = properties.get(ContactDTO.NAME);
     Integer mainOrgUnitId = properties.get(ContactDTO.MAIN_ORG_UNIT);
@@ -86,7 +112,7 @@ public class ContactService extends AbstractEntityService<Contact, Integer, Cont
 
     Contact contact = new Contact();
     contact.setContactModel(contactModel);
-    contact.setLogin(login);
+    contact.setEmail(email);
     contact.setFirstname(firstName);
     contact.setName(name);
     if (mainOrgUnitId != null) {

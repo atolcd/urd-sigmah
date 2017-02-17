@@ -30,6 +30,7 @@ package org.sigmah.client.util.profiler;
 public enum Scenario {
 	LOGIN,
 	OPEN_CONTACT,
+	AGENDA,
 	OPEN_PROJECT,
-	SWITCH_TAB;
+	SWITCH_TAB
 }

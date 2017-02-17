@@ -9,12 +9,12 @@ package org.sigmah.client.ui.view.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -50,7 +50,7 @@ import org.sigmah.shared.dto.referential.ContactModelType;
 public class ContactView extends AbstractView implements ContactPresenter.View {
   private static final int AVATAR_WIDTH = 128;
   private static final int AVATAR_HEIGHT = 128;
-  private static final int CARD_WIDTH = 600;
+  private static final int CARD_WIDTH = 350;
   private static final int LABEL_HEIGHT = 30;
   private static final int PADDING = 15;
 
@@ -58,6 +58,8 @@ public class ContactView extends AbstractView implements ContactPresenter.View {
   private final String AVATAR_DEFAULT_INDIVIDUAL_STYLE_NAME = "contact-card-avatar-individual";
   private final String AVATAR_DEFAULT_ORGANIZATION_STYLE_NAME = "contact-card-avatar-organization";
   private final String LABEL_STYLE_NAME = "contact-card-label";
+  public final String NAME_STYLE_NAME = "contact-card-name";
+  public final String ORGANIZATION_STYLE_NAME = "contact-card-organization";
 
   private ContentPanel contentPanel;
   private HTML avatar;
@@ -154,13 +156,28 @@ public class ContactView extends AbstractView implements ContactPresenter.View {
 
   @Override
   public void addLabel(String label) {
+    addLabel(label, LABEL_STYLE_NAME);
+  }
+
+  @Override
+  public void addNameLabel(String name) {
+    addLabel(name, NAME_STYLE_NAME);
+  }
+
+  @Override
+  public void addOrganizationLabel(String organization) {
+    addLabel(organization, ORGANIZATION_STYLE_NAME);
+  }
+
+  @Override
+  public void addLabel(String label, String style) {
     if (ClientUtils.isBlank(label)) {
       return;
     }
 
     HTML html = new HTML(label);
     html.setHeight(LABEL_HEIGHT + "px");
-    html.setStyleName(LABEL_STYLE_NAME);
+    html.setStyleName(style);
     html.setWordWrap(false);
     if ((topDetailsContainer.getItemCount() + 1 ) * LABEL_HEIGHT > AVATAR_HEIGHT) {
       bottomDetailsContainer.add(html);
@@ -197,6 +214,13 @@ public class ContactView extends AbstractView implements ContactPresenter.View {
     fixTabViewHeight(tabView, tabItem);
 
     tabPanel.add(tabItem);
+  }
+
+  @Override
+  public void selectFirstTab() {
+    if (tabPanel.getItemCount() > 0) {
+      tabPanel.setSelection(tabPanel.getItem(0));
+    }
   }
 
   private void fixTabViewHeight(final Widget tabView, final TabItem tabItem) {

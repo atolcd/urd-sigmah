@@ -39,18 +39,46 @@ import javax.persistence.Table;
 import javax.persistence.TypedQuery;
 
 import org.sigmah.client.util.AdminUtil;
+import org.sigmah.server.computation.ServerComputations;
+import org.sigmah.server.computation.ServerDependencyResolver;
 import org.sigmah.server.dao.ContactModelDAO;
 import org.sigmah.server.domain.ContactModel;
 import org.sigmah.server.domain.OrgUnitModel;
 import org.sigmah.server.domain.ProjectModel;
 import org.sigmah.server.domain.category.CategoryElement;
 import org.sigmah.server.domain.category.CategoryType;
+import org.sigmah.server.domain.element.BudgetElement;
+import org.sigmah.server.domain.element.BudgetRatioElement;
+import org.sigmah.server.domain.element.BudgetSubField;
+import org.sigmah.server.domain.element.ComputationElement;
+import org.sigmah.server.domain.element.DefaultFlexibleElement;
+import org.sigmah.server.domain.element.FilesListElement;
+import org.sigmah.server.domain.element.FlexibleElement;
+import org.sigmah.server.domain.element.QuestionChoiceElement;
+import org.sigmah.server.domain.element.QuestionElement;
+import org.sigmah.server.domain.element.ReportElement;
+import org.sigmah.server.domain.element.ReportListElement;
+import org.sigmah.server.domain.element.TextAreaElement;
+import org.sigmah.server.domain.element.BudgetElement;
+import org.sigmah.server.domain.element.BudgetSubField;
+import org.sigmah.server.domain.element.ComputationElement;
+import org.sigmah.server.domain.element.DefaultFlexibleElement;
+import org.sigmah.server.domain.element.FilesListElement;
+import org.sigmah.server.domain.element.FlexibleElement;
+import org.sigmah.server.domain.element.QuestionChoiceElement;
+import org.sigmah.server.domain.element.QuestionElement;
+import org.sigmah.server.domain.element.ReportElement;
+import org.sigmah.server.domain.element.ReportListElement;
+import org.sigmah.server.domain.element.TextAreaElement;
 import org.sigmah.server.domain.element.*;
 import org.sigmah.server.domain.layout.LayoutConstraint;
 import org.sigmah.server.domain.layout.LayoutGroup;
 import org.sigmah.server.domain.profile.PrivacyGroup;
 import org.sigmah.server.domain.report.ProjectReportModel;
 import org.sigmah.server.mapper.Mapper;
+import org.sigmah.shared.computation.Computation;
+import org.sigmah.shared.computation.Computations;
+import org.sigmah.shared.computation.DependencyResolver;
 import org.sigmah.shared.dto.category.CategoryTypeDTO;
 import org.sigmah.shared.dto.element.BudgetSubFieldDTO;
 import org.sigmah.shared.dto.element.FlexibleElementDTO;
@@ -60,6 +88,8 @@ import org.sigmah.shared.dto.profile.PrivacyGroupDTO;
 import org.sigmah.shared.dto.referential.ContactModelType;
 import org.sigmah.shared.dto.referential.DefaultFlexibleElementType;
 import org.sigmah.shared.dto.referential.ElementTypeEnum;
+import org.sigmah.shared.dto.referential.LogicalElementType;
+import org.sigmah.shared.dto.referential.LogicalElementTypes;
 import org.sigmah.shared.dto.report.ReportModelDTO;
 
 import org.slf4j.Logger;
@@ -75,11 +105,15 @@ public class ModelUtil {
 	 * Logger.
 	 */
 	private static final Logger LOG = LoggerFactory.getLogger(ModelUtil.class);
-
 	private final Provider<EntityManager> entityManagerProvider;
 	private final Mapper mapper;
-
 	private final ContactModelDAO contactModelDAO;
+
+	/**
+	 * Injected {@link ServerDependencyResolver}.
+	 */
+	@Inject
+	private ServerDependencyResolver dependencyResolver;
 
 	@Inject
 	public ModelUtil(Provider<EntityManager> entityManagerProvider, Mapper mapper, ContactModelDAO contactModelDAO) {
@@ -88,7 +122,6 @@ public class ModelUtil {
 		this.contactModelDAO = contactModelDAO;
 	}
 
-	@SuppressWarnings("unchecked")
 	public void persistFlexibleElement(final PropertyMap changes, final Object model) {
 
 		if (changes.get(AdminUtil.PROP_FX_FLEXIBLE_ELEMENT) == null) {
@@ -138,8 +171,11 @@ public class ModelUtil {
 		final BudgetSubFieldDTO ratioDividend = changes.get(AdminUtil.PROP_FX_B_BUDGET_RATIO_DIVIDEND);
 		final BudgetSubFieldDTO ratioDivisor = changes.get(AdminUtil.PROP_FX_B_BUDGET_RATIO_DIVISOR);
 		final String computationRule = changes.get(AdminUtil.PROP_FX_COMPUTATION_RULE);
+		final FlexibleElementDTO budgetSpent = changes.get(AdminUtil.PROP_BUDGET_SPENT);
+		final FlexibleElementDTO budgetPlanned = changes.get(AdminUtil.PROP_BUDGET_PLANNED);
+
 		Number contactListLimit = changes.get(AdminUtil.PROP_FX_CONTACT_LIST_LIMIT);
-		boolean contactListIsMember = changes.get(AdminUtil.PROP_FX_CONTACT_LIST_IS_MEMBER);
+		Boolean contactListIsMember = changes.get(AdminUtil.PROP_FX_CONTACT_LIST_IS_MEMBER);
 		ContactModelType contactListType = changes.get(AdminUtil.PROP_FX_CONTACT_LIST_ALLOWED_TYPE);
 		Set<Integer> contactListAllowedModelIds = changes.get(AdminUtil.PROP_FX_CONTACT_LIST_ALLOWED_MODEL_IDS);
 
@@ -259,7 +295,9 @@ public class ModelUtil {
 		// ////////////////Specific changes
 		Boolean specificChanges = false;
 
-		if ((ElementTypeEnum.DEFAULT.equals(oldType) && type == null) && DefaultFlexibleElementType.BUDGET.equals(((DefaultFlexibleElement) flexibleElt).getType())) {
+		final LogicalElementType logicalElementType = ServerComputations.logicalElementTypeOf(flexibleElt);
+		
+		if ((ElementTypeEnum.DEFAULT.equals(oldType) && type == null) && DefaultFlexibleElementType.BUDGET == logicalElementType.toDefaultFlexibleElementType()) {
 			List<BudgetSubField> budgetFieldsToDelete = new ArrayList<BudgetSubField>();
 			BudgetElement budgetElement = (BudgetElement) flexibleElt;
 			budgetFieldsToDelete.addAll(budgetElement.getBudgetSubFields());
@@ -302,6 +340,21 @@ public class ModelUtil {
 			}
 
 			flexibleElt = em.merge(budgetElement);
+			
+		} else if ((ElementTypeEnum.DEFAULT.equals(oldType) && type == null) && DefaultFlexibleElementType.BUDGET_RATIO == logicalElementType.toDefaultFlexibleElementType()) {	
+			BudgetRatioElement budgetRatioElement = (BudgetRatioElement) flexibleElt;
+			if (budgetSpent != null) {
+				FlexibleElement flexibleElement = new DefaultFlexibleElement();
+				flexibleElement.setId(budgetSpent.getId());
+				budgetRatioElement.setSpentBudget(flexibleElement);
+			}
+			if (budgetPlanned != null) {
+				FlexibleElement flexibleElement = new DefaultFlexibleElement();
+				flexibleElement.setId(budgetPlanned.getId());
+				budgetRatioElement.setPlannedBudget(flexibleElement);
+			}
+		
+			flexibleElt = em.merge(budgetRatioElement);
 		} else if (ElementTypeEnum.FILES_LIST.equals(type) || (ElementTypeEnum.FILES_LIST.equals(oldType) && type == null)) {
 			FilesListElement filesListElement = (FilesListElement) flexibleElt;
 			// FilesListElement filesListElement =
@@ -432,7 +485,8 @@ public class ModelUtil {
 			ComputationElement computationElement = (ComputationElement) flexibleElt;
 			if (computationElement != null) {
 				if (computationRule != null) {
-					computationElement.setRule(computationRule);
+					final String rule = resolveComputationRule(em, dependencyResolver, model, computationRule);
+					computationElement.setRule(rule);
 					specificChanges = true;
                     
                     removeAllValuesForElement(computationElement, em);
@@ -496,8 +550,36 @@ public class ModelUtil {
 		em.clear();
 	}
 
-	private String retrieveTable(final String className) {
+	/**
+	 * Parse and resolve each dependency contained in the given formula.
+	 * 
+	 * @param em
+	 *			Instance of the EntityManager
+	 * @param dependencyResolver
+	 *			Dependency resolver to use.
+	 * @param model
+	 *			Project or org unit model.
+	 * @param computationRule
+	 *			Formula to parse and format.
+	 * @return The formula with its dependencies resolved.
+	 * @throws IllegalArgumentException If a dependency could not be resolved.
+	 */
+	private static String resolveComputationRule(final EntityManager em, final DependencyResolver dependencyResolver, final Object model, final String computationRule) throws IllegalArgumentException {
+		if (dependencyResolver != null && model instanceof ProjectModel) {
+			final ProjectModel projectModel = em.find(ProjectModel.class, ((ProjectModel) model).getId());
+			final Computation computation = Computations.parse(computationRule, ServerComputations.getAllElementsFromModel(projectModel));
+			dependencyResolver.resolve(computation);
+			
+			if (!computation.isResolved()) {
+				throw new IllegalArgumentException("Computation '" + computationRule + "' could not be resolved.");
+			}
+			
+			return computation.toString();
+		}
+		return computationRule;
+	}
 
+	private String retrieveTable(final String className) {
 		final int bI = className.lastIndexOf(".") + 1;
 		String table = className.substring(bI);
 

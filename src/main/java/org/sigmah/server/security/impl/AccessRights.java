@@ -130,7 +130,6 @@ final class AccessRights {
 
 		// Commands.
 		sperm(commandToken(AddOrgUnit.class), GrantType.AUTHENTICATED_ONLY);
-		sperm(commandToken(AddPartner.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(AmendmentActionCommand.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(BackupArchiveManagementCommand.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(BatchCommand.class), GrantType.AUTHENTICATED_ONLY);
@@ -159,8 +158,6 @@ final class AccessRights {
 		sperm(commandToken(GetBaseMaps.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(GetCalendar.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(GetCategories.class), GrantType.AUTHENTICATED_ONLY);
-		sperm(commandToken(GetContact.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.VIEW_VISIBLE_CONTACTS);
-		sperm(commandToken(GetContacts.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.VIEW_VISIBLE_CONTACTS);
 		sperm(commandToken(GetContactDuplicatedProperties.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.VIEW_VISIBLE_CONTACTS);
 		sperm(commandToken(GetContactHistory.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.VIEW_VISIBLE_CONTACTS);
 		sperm(commandToken(GetContactModel.class), GrantType.AUTHENTICATED_ONLY);
@@ -197,13 +194,13 @@ final class AccessRights {
 		sperm(commandToken(GetProjectTeamMembers.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.VIEW_PROJECT_TEAM_MEMBERS);
 		sperm(commandToken(GetReminders.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(GetUsersByOrganization.class), GrantType.AUTHENTICATED_ONLY);
-		sperm(commandToken(GetUsers.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(GetUsersWithProfiles.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(GetUsersByOrgUnit.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(GetValue.class), GrantType.AUTHENTICATED_ONLY);
+		sperm(commandToken(GetValueFromLinkedProjects.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(Synchronize.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(UpdateContact.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.VIEW_VISIBLE_CONTACTS);
-		sperm(commandToken(UpdateLayoutGroupIterations.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.CREATE_ITERATIONS);
+		sperm(commandToken(UpdateLayoutGroupIterations.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(UpdateProject.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(UpdateProjectFavorite.class), GrantType.AUTHENTICATED_ONLY);
 		sperm(commandToken(UpdateProjectTeamMembers.class), GrantType.AUTHENTICATED_ONLY, GlobalPermissionEnum.EDIT_PROJECT_TEAM_MEMBERS);

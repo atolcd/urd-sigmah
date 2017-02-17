@@ -36,15 +36,26 @@ import org.sigmah.server.dispatch.impl.UserDispatch.UserExecutionContext;
 import org.sigmah.server.domain.Amendment;
 import org.sigmah.server.domain.HistoryToken;
 import org.sigmah.server.domain.Project;
+import org.sigmah.server.domain.element.ComputationElement;
 import org.sigmah.server.domain.element.DefaultFlexibleElement;
 import org.sigmah.server.domain.element.FlexibleElement;
 import org.sigmah.server.file.FileStorageProvider;
 import org.sigmah.server.handler.base.AbstractCommandHandler;
+import org.sigmah.server.service.ComputationService;
 import org.sigmah.shared.command.GetValue;
 import org.sigmah.shared.command.result.ValueResult;
+import org.sigmah.shared.computation.value.ComputedValue;
+import org.sigmah.shared.computation.value.ComputedValues;
 import org.sigmah.shared.dispatch.CommandException;
+import org.sigmah.shared.dto.element.BudgetDistributionElementDTO;
+import org.sigmah.shared.dto.element.BudgetRatioElementDTO;
+import org.sigmah.shared.dto.element.ComputationElementDTO;
 import org.sigmah.shared.dto.element.DefaultFlexibleElementDTO;
 import org.sigmah.shared.dto.element.FilesListElementDTO;
+import org.sigmah.shared.dto.element.IndicatorsListElementDTO;
+import org.sigmah.shared.dto.element.MessageElementDTO;
+import org.sigmah.shared.dto.element.ReportListElementDTO;
+import org.sigmah.shared.dto.element.TripletsListElementDTO;
 import org.sigmah.shared.dto.report.ReportReference;
 import org.sigmah.shared.dto.value.BudgetPartsListValueDTO;
 import org.sigmah.shared.dto.value.FileDTO;
@@ -75,6 +86,12 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 	 */
 	@Inject
 	private FileStorageProvider fileStorageProvider;
+	
+	/**
+	 * Service to compute values of ComputationElements.
+	 */
+	@Inject
+	private ComputationService computationService;
 
 	/**
 	 * Gets a flexible element value from the database.
@@ -100,13 +117,13 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 			final TypedQuery<Amendment> amedmentQuery = em().createQuery("SELECT a FROM Amendment a WHERE a.id = :amendmentId", Amendment.class);
 			amedmentQuery.setParameter("amendmentId", cmd.getAmendmentId());
 
-			Amendment amendment = amedmentQuery.getSingleResult();
+			final Amendment amendment = amedmentQuery.getSingleResult();
 
 			final List<HistoryToken> tokens = amendment.getValues();
 
 			if (tokens != null) {
 				for (final HistoryToken token : tokens) {
-					if (token.getElementId().equals(cmd.getElementId()) && token.getLayoutGroupIterationId().equals(cmd.getIterationId())) {
+					if (token.getElementId().equals(cmd.getElementId()) && token.getLayoutGroupIterationId() == cmd.getIterationId()) {
 						historyValue = token.getValue();
 					}
 				}
@@ -118,8 +135,10 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 		// --------------------------------------------------------------------
 
 		final String valueFromDatabase;
-		if(DefaultFlexibleElementDTO.ENTITY_NAME.equals(cmd.getElementEntityName())) {
+		if (DefaultFlexibleElementDTO.ENTITY_NAME.equals(cmd.getElementEntityName())) {
 			valueFromDatabase = findCurrentValueOfDefaultElement(cmd.getProjectId(), cmd.getElementId());
+		} else if (BudgetRatioElementDTO.ENTITY_NAME.equals(cmd.getElementEntityName())) {
+			valueFromDatabase = findCurrentValueOfBudgetRatioElement(cmd.getProjectId(), cmd.getElementId());
 		} else {
 			valueFromDatabase = findCurrentValue(cmd.getProjectId(), cmd.getElementId(), cmd.getIterationId());
 		}
@@ -138,6 +157,15 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 		// No value exists for the flexible element.
 		if (!isValueExisting) {
 			LOG.debug("No value for this flexible element #{}.", cmd.getElementId());
+			
+			if (ComputationElementDTO.ENTITY_NAME.equals(cmd.getElementEntityName())) {
+				final ComputationElement computationElement = em().find(ComputationElement.class, cmd.getElementId());
+				final Project project = em().find(Project.class, cmd.getProjectId());
+				
+				final ComputedValue computedValue = computationService.computeValueForProject(computationElement, project);
+				valueResult.setValueObject(computedValue.toString());
+			}
+			
 			return valueResult;
 		}
 
@@ -152,7 +180,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 		Boolean isList = null;
 
 		// Creates the sub-select query to get the true value.
-		if (elementClassName.equals("element.TripletsListElement")) {
+		if (elementClassName.equals(TripletsListElementDTO.ENTITY_NAME)) {
 
 			LOG.debug("Case TripletsListElementDTO.");
 
@@ -162,7 +190,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 			query = em().createQuery("SELECT tv FROM TripletValue tv WHERE tv.id IN (:idsList)");
 			query.setParameter("idsList", ValueResultUtils.splitValuesAsInteger(valueAsString));
 
-		} else if (elementClassName.equals("element.IndicatorsListElement")) {
+		} else if (elementClassName.equals(IndicatorsListElementDTO.ENTITY_NAME)) {
 
 			LOG.debug("Case IndicatorsListElementDTO.");
 
@@ -172,7 +200,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 			query = em().createQuery("SELECT ilv FROM IndicatorsListValue ilv WHERE ilv.id.idList = :value");
 			query.setParameter("value", Integer.valueOf(valueAsString));
 
-		} else if (elementClassName.equals("element.BudgetDistributionElement")) {
+		} else if (elementClassName.equals(BudgetDistributionElementDTO.ENTITY_NAME)) {
 
 			LOG.debug("Case BudgetDistributionElementDTO.");
 
@@ -182,7 +210,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 			query = em().createQuery("SELECT bplv FROM BudgetPartsListValue bplv WHERE bplv.id = :value");
 			query.setParameter("value", Integer.valueOf(valueAsString));
 
-		} else if (elementClassName.equals("element.FilesListElement")) {
+		} else if (elementClassName.equals(FilesListElementDTO.ENTITY_NAME)) {
 
 			LOG.debug("Case FilesListElementDTO.");
 
@@ -192,7 +220,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 			query = em().createQuery("SELECT f FROM File f WHERE f.id IN (:idsList)");
 			query.setParameter("idsList", ValueResultUtils.splitValuesAsInteger(valueAsString));
 
-		} else if (elementClassName.equals("element.ReportListElement")) {
+		} else if (elementClassName.equals(ReportListElementDTO.ENTITY_NAME)) {
 
 			LOG.debug("Case ReportListElementDTO.");
 
@@ -202,7 +230,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 			query = em().createQuery("SELECT r FROM ProjectReport r WHERE r.id IN (:idList)");
 			query.setParameter("idList", ValueResultUtils.splitValuesAsInteger(valueAsString));
 
-		} else if (!(elementClassName.equals("element.MessageElement"))) {
+		} else if (!(elementClassName.equals(MessageElementDTO.ENTITY_NAME))) {
 
 			LOG.debug("Case others (but MessageElementDTO).");
 
@@ -230,7 +258,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 
 			final List<ListableValue> serializablesList = new ArrayList<>();
 			for (Object o : objectsList) {
-				serializablesList.add(mapper().map(o, dto));
+				serializablesList.add(mapper().map(o, dto.getClass()));
 			}
 			
 			if(elementClassName.equals(FilesListElementDTO.ENTITY_NAME)) {
@@ -259,7 +287,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 
 		return valueResult;
 	}
-
+	
 	private String findCurrentValue(int projectId, int elementId, Integer iterationId) {
 		// Creates the query to get the value for the flexible element (as
 		// string) in the Value table.
@@ -267,8 +295,8 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 
 		if(iterationId == null) {
 			valueQuery = em().createQuery("SELECT v.value FROM Value v WHERE v.containerId = :projectId AND v.element.id = :elementId", String.class);
-			valueQuery.setParameter("projectId", projectId);
-			valueQuery.setParameter("elementId", elementId);
+		valueQuery.setParameter("projectId", projectId);
+		valueQuery.setParameter("elementId", elementId);
 		} else {
 			valueQuery = em().createQuery("SELECT v.value FROM Value v WHERE v.element.id = :elementId AND v.layoutGroupIteration.id = :iterationId", String.class);
 			valueQuery.setParameter("elementId", elementId);
@@ -276,7 +304,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 		}
 
 		String valueAsString;
-
+		
 		// Executes the query and tests if a value exists for this flexible
 		// element.
 		try {
@@ -287,7 +315,7 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 		} catch (NoResultException | ClassCastException e) {
 			valueAsString = null;
 		}
-
+		
 		return valueAsString;
 	}
 	
@@ -295,8 +323,47 @@ public class GetValueHandler extends AbstractCommandHandler<GetValue, ValueResul
 		final Project container = em().find(Project.class, projectId);
 		final DefaultFlexibleElement element = em().find(DefaultFlexibleElement.class, elementId);
 		
-		// TODO: Should also handle BudgetElements.
-		
 		return element.getValue(container);
 	}
+	
+	/**
+	 * Find in database the current value of a budget ratio element.
+	 * 
+	 * @param containerId
+	 * @param elementId
+	 * @return 
+	 */
+	private String findCurrentValueOfBudgetRatioElement(int containerId, int elementId) {
+		
+		// Selecting multiple columns results in an Object[] return type.
+		// http://docs.oracle.com/cd/E17904_01/apirefs.1111/e13946/ejb3_langref.html#ejb3_langref_resulttype
+		final TypedQuery<Object[]> valueQuery = em().createQuery("SELECT v1.value, v2.value "
+				+ "FROM BudgetRatioElement bre, Value v1, Value v2 "
+				+ "WHERE bre.id = :elementId "
+				+ "AND v1.containerId = :containerId AND v1.element = bre.spentBudget "
+				+ "AND v2.containerId = :containerId AND v2.element = bre.plannedBudget", Object[].class);
+		
+		valueQuery.setParameter("containerId", containerId);
+		valueQuery.setParameter("elementId", elementId);
+		
+		// Executes the query and tests if a value exists for this flexible
+		// element.
+		try {
+			final Object[] values = valueQuery.getSingleResult();
+			if (values != null && values.length == 2) {
+				final ComputedValue spent = ComputedValues.from((String) values[0]);
+				final ComputedValue planned = ComputedValues.from((String) values[1]);
+				
+				final Double valueAsDouble = planned.divide(spent).get();
+				if (valueAsDouble != null) {
+					return valueAsDouble.toString();
+				}
+			}
+		} catch (NoResultException e) {
+			// Ignored.
+		}
+		
+		return null;
+	}
+	
 }

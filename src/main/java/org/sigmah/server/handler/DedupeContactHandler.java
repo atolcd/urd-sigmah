@@ -9,12 +9,12 @@ package org.sigmah.server.handler;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -74,7 +74,7 @@ public class DedupeContactHandler extends AbstractCommandHandler<DedupeContact, 
       Contact originContact = contactDAO.findById(command.getOriginContactId());
       mergeContacts(originContact, targetedContact, command.getContactDuplicatedProperties(), context.getUser());
     } else {
-      applyProperties(command.getContactDuplicatedProperties(), targetedContact);
+      applyProperties(command.getContactDuplicatedProperties(), targetedContact, context.getUser());
     }
 
     return mapper().map(targetedContact, new ContactDTO());
@@ -158,7 +158,7 @@ public class DedupeContactHandler extends AbstractCommandHandler<DedupeContact, 
     }
   }
 
-  private void applyProperties(List<ContactDuplicatedProperty> properties, Contact contact) {
+  private void applyProperties(List<ContactDuplicatedProperty> properties, Contact contact, User user) {
     // This function is always called when the new contact was in creation
     // So only default values are concerned by the properties
     for (ContactDuplicatedProperty property : properties) {
@@ -235,5 +235,6 @@ public class DedupeContactHandler extends AbstractCommandHandler<DedupeContact, 
           throw new IllegalStateException("Unknown DefaultContactFlexibleElementType : " + flexibleElement.getType());
       }
     }
+    contactDAO.persist(contact, user);
   }
 }

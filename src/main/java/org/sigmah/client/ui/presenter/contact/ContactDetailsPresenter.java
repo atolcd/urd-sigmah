@@ -9,12 +9,12 @@ package org.sigmah.client.ui.presenter.contact;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -46,6 +46,7 @@ import com.extjs.gxt.ui.client.widget.form.FormPanel.Method;
 import com.extjs.gxt.ui.client.widget.layout.FormData;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -55,10 +56,13 @@ import org.sigmah.client.computation.ComputationTriggerManager;
 import org.sigmah.client.dispatch.CommandResultHandler;
 import org.sigmah.client.dispatch.DispatchQueue;
 import org.sigmah.client.dispatch.monitor.LoadingMask;
+import org.sigmah.client.event.UpdateEvent;
 import org.sigmah.client.i18n.I18N;
 import org.sigmah.client.inject.Injector;
 import org.sigmah.client.page.Page;
+import org.sigmah.client.page.PageRequest;
 import org.sigmah.client.page.RequestParameter;
+import org.sigmah.client.ui.notif.ConfirmCallback;
 import org.sigmah.client.ui.notif.N10N;
 import org.sigmah.client.ui.presenter.base.AbstractPresenter;
 import org.sigmah.client.ui.view.base.ViewInterface;
@@ -80,6 +84,7 @@ import org.sigmah.shared.command.GetCountry;
 import org.sigmah.shared.command.GetLayoutGroupIterations;
 import org.sigmah.shared.command.GetValue;
 import org.sigmah.shared.command.UpdateContact;
+import org.sigmah.shared.command.UpdateEntity;
 import org.sigmah.shared.command.UpdateLayoutGroupIterations;
 import org.sigmah.shared.command.UpdateLayoutGroupIterations.IterationChange;
 import org.sigmah.shared.command.result.ContactDuplicatedProperty;
@@ -115,6 +120,8 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
     LayoutContainer getDetailsContainer();
 
     Button getSaveButton();
+
+    Button getDeleteButton();
 
     Button getExportButton();
 
@@ -182,6 +189,9 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
     gridLayout.setCellPadding(0);
     gridLayout.setCellSpacing(0);
 
+    // unique id
+    formPanel.add(new Label(I18N.CONSTANTS.contactUniqueId() + contactDTO.getId()));
+
     final DispatchQueue queue = new DispatchQueue(dispatch, true);
 
     for (final LayoutGroupDTO groupLayout : layout.getGroups()) {
@@ -190,6 +200,9 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
       if(!groupLayout.getHasIterations()) {
 
         FieldSet fieldSet = createGroupLayoutFieldSet(contactDTO, groupLayout, queue, null, null, null);
+        fieldSet.setHeadingHtml(groupLayout.getTitle());
+        fieldSet.setCollapsible(true);
+        fieldSet.setBorders(true);
         gridLayout.setWidget(groupLayout.getRow(), groupLayout.getColumn(), fieldSet);
         continue;
       }
@@ -316,9 +329,16 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
                   @Override
                   protected void onCommandSuccess(ContactDTO targetedContactDTO) {
                     dedupeContactDialog.hide();
+                    final PageRequest currentRequest = injector.getPageManager().getCurrentPageRequest(false);
                     eventBus.navigateRequest(Page.CONTACT_DASHBOARD.requestWith(RequestParameter.ID, targetedContactId));
+                    eventBus.fireEvent(new UpdateEvent(UpdateEvent.CONTACT_DELETE, currentRequest));
                   }
                 });
+              }
+
+              @Override
+              public void handleCancel() {
+                dedupeContactDialog.hide();
               }
             });
             dedupeContactDialog.addWindowListener(new WindowListener() {
@@ -336,6 +356,18 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
         });
       }
     });
+
+    view.getDeleteButton().removeAllListeners();
+    view.getDeleteButton().addSelectionListener(new SelectionListener<ButtonEvent>() {
+
+      @Override
+      public void componentSelected(final ButtonEvent ce) {
+        onDeleteContact(contactDTO);
+      }
+    });
+    view.getDeleteButton().setEnabled(canDeleteContact());
+    view.getDeleteButton().setVisible(canDeleteContact());
+
 
     // --
     // Contact export button handler.
@@ -363,11 +395,11 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
       case INDIVIDUAL:
         String currentFamilyName = getCurrentSingleValue(DefaultContactFlexibleElementType.FAMILY_NAME, contactDTO.getFamilyName());
         String currentFirstName = getCurrentSingleValue(DefaultContactFlexibleElementType.FIRST_NAME, contactDTO.getFirstname());
-        checkDuplicationCommand = new CheckContactDuplication(contactDTO.getId(), currentEmail, currentFamilyName, currentFirstName);
+        checkDuplicationCommand = new CheckContactDuplication(contactDTO.getId(), currentEmail, currentFamilyName, currentFirstName, contactDTO.getContactModel());
         break;
       case ORGANIZATION:
         String currentOrganizationName = getCurrentSingleValue(DefaultContactFlexibleElementType.ORGANIZATION_NAME, contactDTO.getOrganizationName());
-        checkDuplicationCommand = new CheckContactDuplication(contactDTO.getId(), currentEmail, currentOrganizationName, null);
+        checkDuplicationCommand = new CheckContactDuplication(contactDTO.getId(), currentEmail, currentOrganizationName, null, contactDTO.getContactModel());
         break;
       default:
         throw new IllegalStateException("Unknown ContactModelType : " + contactDTO.getContactModel().getType());
@@ -599,6 +631,7 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
           protected void onCommandSuccess(final VoidResult result) {
 
             N10N.infoNotif(I18N.CONSTANTS.infoConfirmation(), I18N.CONSTANTS.saveConfirm());
+            eventBus.fireEvent(new UpdateEvent(UpdateEvent.CONTACT_UPDATE, contactDTO));
 
             // Checks if there is any update needed to the local project instance.
             for (final ValueEvent event : valueChanges) {
@@ -612,6 +645,7 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
             if (callback != null) {
               callback.onSuccess(contactDTO);
             }
+            refresh(contactDTO);
           }
         }, view.getSaveButton(), new LoadingMask(view.getDetailsContainer()), new LoadingMask(target));
       }
@@ -711,6 +745,53 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
   }
 
   /**
+   * Method executed on delete contact action.
+   *
+   * @param contact
+   *          The contact to delete.
+   */
+  private void onDeleteContact(final ContactDTO contact) {
+
+    if (contact == null || !canDeleteContact()) {
+      return;
+    }
+    N10N.confirmation(I18N.CONSTANTS.confirmDeleteContactMessageBoxTitle(), I18N.CONSTANTS.confirmDeleteContactMessageBoxContent(), new ConfirmCallback() {
+
+      /**
+       * OK action.
+       */
+      @Override
+      public void onAction() {
+
+        final Map<String, Object> changes = new HashMap<String, Object>();
+        changes.put("dateDeleted", new Date());
+
+        dispatch.execute(new UpdateEntity(contact, changes), new CommandResultHandler<VoidResult>() {
+
+          @Override
+          public void onCommandSuccess(final VoidResult result) {
+
+            final PageRequest currentRequest = injector.getPageManager().getCurrentPageRequest(false);
+            eventBus.fireEvent(new UpdateEvent(UpdateEvent.CONTACT_DELETE, currentRequest));
+
+            N10N.infoNotif(I18N.CONSTANTS.deleteContactNotificationTitle(), I18N.CONSTANTS.deleteContactNotificationContent());
+          }
+        }, view.getDeleteButton());
+
+      }
+    });
+  }
+
+  /**
+   * Returns if the current authenticated user is authorized to delete a contact.
+   *
+   * @return {@code true} if the current authenticated user is authorized to delete a contact.
+   */
+  private boolean canDeleteContact() {
+    return ProfileUtils.isGranted(auth(), GlobalPermissionEnum.DELETE_VISIBLE_CONTACTS);
+  }
+
+  /**
    * Method executed on export contact action.
    *
    * @param contact
@@ -743,5 +824,9 @@ public class ContactDetailsPresenter extends AbstractPresenter<ContactDetailsPre
         form.removeFromParent();
       }
     });
+  }
+
+  public boolean hasValueChanged() {
+    return !valueChanges.isEmpty() || !iterationChanges.isEmpty();
   }
 }

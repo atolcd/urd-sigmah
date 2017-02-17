@@ -9,12 +9,12 @@ package org.sigmah.server.handler;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -42,6 +42,11 @@ public class GetContactHandler extends AbstractCommandHandler<GetContact, Contac
   @Override
   protected ContactDTO execute(GetContact command, UserDispatch.UserExecutionContext context) throws CommandException {
     Contact contact = contactDAO.findById(command.getContactId());
+
+    if (contact.isDeleted()) {
+      return null;
+    }
+
     // FIXME: Add command.mode when dozer 5.5.2 will be ready
     // see https://github.com/DozerMapper/dozer/commit/5e179bb68c91e60d63bf9f44bf64b7ca70f61520
     return mapper().map(contact, new ContactDTO());

@@ -10,6 +10,8 @@
 
 	<groupId>org.sigmah</groupId>
 	<artifactId>sigmah</artifactId>
+	<!-- Any change of version here should also be reported manually client-side in 
+		public static final String VERSION of /src/main/java/org/sigmah/client/Sigmah.java  -->
 	<version>2.2-SNAPSHOT</version>
 
 	<packaging>war</packaging>
@@ -23,7 +25,7 @@
 	<inceptionYear>2010</inceptionYear>
 
 	<organization>
-		<name>URD</name>
+		<name>Groupe URD</name>
 		<url>http://www.urd.org</url>
 	</organization>
 
@@ -192,6 +194,7 @@
 		<itext.version>2.1.7</itext.version>
 		<itext-rtf.version>2.1.7</itext-rtf.version>
 		<quartz.version>1.5.2</quartz.version>
+		<gson.version>2.6.1</gson.version>
 		
 		<!-- ========= [ DEFAULT PROFILES PROPERTIES. ] ========= -->
 		
@@ -246,7 +249,7 @@
 		<mail.contentType>text/html</mail.contentType>
 
 		<mail.support.to>support@sigmah.org</mail.support.to>
-
+		
 		<!-- Maps API properties. -->
 
 		<maps.key>ABQIAAAAaKyZGjYsJ9quclBfsnGc-xRxtna0S6DNUYSvLTUdQl9eB6x9_xQH4P0V3CSFEY_MypecLWSdS3Q8IQ</maps.key>
@@ -560,6 +563,11 @@
 			<artifactId>bcprov-jdk14</artifactId>
 			<version>1.38</version>
 		</dependency>
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>${gson.version}</version>
+		</dependency>
 
 	</dependencies>
 
@@ -638,6 +646,16 @@
 							<url>http://www.netapsys.fr</url>
 						</partner>
 						<partner>
+							<name>Atol Conseils et Développements</name>
+							<role>developer</role>
+							<url>http://www.atolcd.com</url>
+						</partner>
+						<partner>
+							<name>Code Lutin</name>
+							<role>developer</role>
+							<url>http://www.codelutin.com</url>
+						</partner>
+						<partner>
 							<name>Adergo</name>
 							<role>ergonomist</role>
 							<url>http://www.adergo.com</url>
@@ -663,12 +681,19 @@
 							<email>raphael.calabro@netapsys.fr</email>
 						</developer>
 						<developer>
+							<name>cihanya</name>
+						</developer>
+						<developer>
 							<name>Lucia Cojocaru</name>
 							<email>lucia_coj@yahoo.com</email>
 						</developer>
 						<developer>
 							<name>Denis Colliot</name>
 							<email>denis.colliot@gmail.com</email>
+						</developer>
+ 						<developer>
+							<name>tdegivry</name>
+							<email>tde@atolcd.com</email>
 						</developer>
 						<developer>
 							<name>Zhe Hu</name>
@@ -677,6 +702,13 @@
 						<developer>
 							<name>Guerline Jean-Baptiste</name>
 							<email>jbguerline@live.fr</email>
+						</developer>
+						<developer>
+							<name>mohamedkha</name>
+						</developer>
+						<developer>
+							<name>Brendan Le Ny</name>
+							<email>bleny@codelutin.com</email>
 						</developer>
 						<developer>
 							<name>Maxime Lombard</name>
@@ -706,6 +738,10 @@
 							<name>Nadia Rebiai</name>
 							<email>nadiarebiai@gmail.com</email>
 						</developer>
+						<developer>
+							<name>ftavin</name>
+							<email>f.tavin@atolcd.com</email>
+						</developer>
 					</developers>
 					<!-- Maven property: ${sigmah.version.contributors} -->
 					<contributors>
@@ -718,6 +754,9 @@
 							<!--<email>Mathilde.Beziau@croix-rouge.fr</email>-->
 						</contributor>
 						<contributor>
+							<name>Jean-Christophe Brard</name>
+						</contributor>
+						<contributor>
 							<name>Fadoi Chaouki</name>
 							<!--<email>fadoichaouki@hotmail.fr</email>-->
 						</contributor>
@@ -726,12 +765,18 @@
 							<!--<email>jcarlier@urd.org</email>-->
 						</contributor>
 						<contributor>
+							<name>Salomé Cousinié</name>
+						</contributor>
+						<contributor>
 							<name>Emeline Dupont-Huin</name>
 							<!--<email>emeline.dupont-huin@medecinsdumonde.net</email>-->
 						</contributor>
 						<contributor>
 							<name>Mathilde Guilment</name>
 							<!--<email>mathilde.guilment@gmail.com</email>-->
+						</contributor>
+						<contributor>
+							<name>Philomène Maigron</name>
 						</contributor>
 						<contributor>
 							<name>Oussama Mojahed</name>

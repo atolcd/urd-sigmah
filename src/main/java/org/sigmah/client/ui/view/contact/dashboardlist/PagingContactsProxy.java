@@ -10,12 +10,12 @@ package org.sigmah.client.ui.view.contact.dashboardlist;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -127,7 +127,9 @@ public class PagingContactsProxy extends MemoryProxy<PagingLoadResult<DashboardC
               return compareNullableStrings(nom1, nom2);
             }
             if (sortField.equals(ContactHistory.UPDATED_AT)) {
-              return compareNullableDates(p1.getLastChange().getUpdatedAt(), p2.getLastChange().getUpdatedAt());
+              Date d1 = p1.getLastChange() != null ? p1.getLastChange().getUpdatedAt() : null;
+              Date d2 = p2.getLastChange() != null ? p2.getLastChange().getUpdatedAt() : null;
+              return compareNullableDates(d1, d2);
             }
             if (sortField.equals(ContactHistory.COMMENT)) {
               return compareNullableStrings(p1.getLastChange().getComment(), p2.getLastChange().getComment());
